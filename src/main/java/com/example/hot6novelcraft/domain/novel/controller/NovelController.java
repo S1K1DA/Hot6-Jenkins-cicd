@@ -2,16 +2,15 @@ package com.example.hot6novelcraft.domain.novel.controller;
 
 import com.example.hot6novelcraft.common.dto.BaseResponse;
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelCreateRequest;
+import com.example.hot6novelcraft.domain.novel.dto.request.NovelUpdateRequest;
 import com.example.hot6novelcraft.domain.novel.dto.response.NovelCreateResponse;
+import com.example.hot6novelcraft.domain.novel.dto.response.NovelUpdateResponse;
 import com.example.hot6novelcraft.domain.novel.service.NovelService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -32,5 +31,21 @@ public class NovelController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(BaseResponse.success("201", "소설 등록 성공", response));
+    }
+
+    /**
+     * 소설 수정
+     * 정은식
+     */
+    @PatchMapping("/{novelId}")
+    public ResponseEntity<BaseResponse<NovelUpdateResponse>> updateNovel(
+            @PathVariable Long novelId,
+            @Valid @RequestBody NovelUpdateRequest request
+    ) {
+        NovelUpdateResponse response = novelService.updateNovel(novelId, request);
+
+        return ResponseEntity.ok(
+                BaseResponse.success("200", "소설 수정 성공", response)
+        );
     }
 }

@@ -1,7 +1,11 @@
 package com.example.hot6novelcraft.domain.novel.service;
 
+import com.example.hot6novelcraft.common.exception.ServiceErrorException;
+import com.example.hot6novelcraft.common.exception.domain.NovelExceptionEnum;
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelCreateRequest;
+import com.example.hot6novelcraft.domain.novel.dto.request.NovelUpdateRequest;
 import com.example.hot6novelcraft.domain.novel.dto.response.NovelCreateResponse;
+import com.example.hot6novelcraft.domain.novel.dto.response.NovelUpdateResponse;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,18 +22,42 @@ public class NovelService {
     @Transactional
     public NovelCreateResponse createNovel(NovelCreateRequest request) {
 
-        // JWT 구현후 작가ID로 교체 및 작가 권한 확인 예정임다!!!!!!!
+        // TODO : JWT 구현후 작가ID로 교체 및 작가 권한 확인 예정임다!!!!!!!
 
-        Novel novel = Novel.builder()
-                .authorId(1L) // 임시 JWT 구현 후 수정
-                .title(request.title())
-                .description(request.description())
-                .genre(request.genre().toString())
-                .tags(request.tagsToString())
-                .build();
+        Novel novel = Novel.createNovel(
+                1L,
+                request.title(),
+                request.description(),
+                request.genre().toString(),
+                request.tagsToString()
+        );
+
         // DB 저장
         Novel savedNovel = novelRepository.save(novel);
 
         return NovelCreateResponse.from(savedNovel.getId());
+    }
+
+    // 소설 수정
+    @Transactional
+    public NovelUpdateResponse updateNovel(Long novelId, NovelUpdateRequest request) {
+
+        // 소설 조회
+        Novel novel = novelRepository.findById(novelId)
+                .orElseThrow(() -> new ServiceErrorException(NovelExceptionEnum.NOVEL_NOT_FOUND));
+
+        // TODO : JWT 구현후 작가ID로 교체 및 작가 권한 확인 예정임다!!!!!!!
+        // 작가 권한 확인 (role = AUTHOR)
+        // 본인 소설 확인 (novel.getAuthorId() == 로그인한 유저 ID)
+
+        // 소설 수정
+        novel.update(
+                request.title(),
+                request.description(),
+                request.genre().toString(),
+                request.tagsToString()
+        );
+
+        return NovelUpdateResponse.from(novel.getId());
     }
 }

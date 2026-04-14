@@ -4,7 +4,9 @@ import com.example.hot6novelcraft.common.exception.ServiceErrorException;
 import com.example.hot6novelcraft.common.exception.domain.EpisodeExceptionEnum;
 import com.example.hot6novelcraft.common.exception.domain.NovelExceptionEnum;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeCreateRequest;
+import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeUpdateRequest;
 import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeCreateResponse;
+import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeUpdateResponse;
 import com.example.hot6novelcraft.domain.episode.entity.Episode;
 import com.example.hot6novelcraft.domain.episode.repository.EpisodeRepository;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
@@ -54,6 +56,21 @@ public class EpisodeService {
         Episode savedEpisode = episodeRepository.save(episode);
 
         return EpisodeCreateResponse.from(savedEpisode.getId());
+    }
+
+    // 회차 수정
+    @Transactional
+    public EpisodeUpdateResponse updateEpisode(Long episodeId, EpisodeUpdateRequest request) {
+
+        // TODO : JWT 구현후 작가ID로 교체 및 작가 권한 확인 예정임다!!!!!!!
+
+        // 회차 조회
+        Episode episode = findEpisodeById(episodeId);
+
+        // 회차 수정
+        episode.update(request.title(), request.content());
+
+        return EpisodeUpdateResponse.from(episode.getId());
     }
 
     // 소설 조회 공통 메서드

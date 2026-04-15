@@ -13,8 +13,7 @@ import java.time.LocalDateTime;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "novel_wiki",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"novel_id", "category"}))
+@Table(name = "novel_wiki")
 public class NovelWiki extends BaseEntity {
 
     @Id
@@ -26,6 +25,9 @@ public class NovelWiki extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     private WikiCategory category;
+
+    @Column(nullable = false, length = 20)
+    private String title;
 
     @Column(columnDefinition = "TEXT")
     private String content;
@@ -43,10 +45,28 @@ public class NovelWiki extends BaseEntity {
         updatedAt = LocalDateTime.now();
     }
 
+    // 설정집 생성
+    public static NovelWiki createWiki(Long novelId, WikiCategory category,
+                                       String title, String content) {
+        return NovelWiki.builder()
+                .novelId(novelId)
+                .category(category)
+                .title(title)
+                .content(content)
+                .build();
+    }
+
+    // 설정집 수정
+    public void update(String title, String content) {
+        if (title != null) this.title = title;
+        if (content != null) this.content = content;
+    }
+
     @Builder
-    public NovelWiki(Long novelId, WikiCategory category, String content) {
+    public NovelWiki(Long novelId, WikiCategory category, String title, String content) {
         this.novelId = novelId;
         this.category = category;
+        this.title = title;
         this.content = content;
     }
 }

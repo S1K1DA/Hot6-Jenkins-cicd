@@ -1,26 +1,52 @@
 package com.example.hot6novelcraft.domain.payment.controller;
 
 import com.example.hot6novelcraft.common.dto.BaseResponse;
+import com.example.hot6novelcraft.common.dto.PageResponse;
 import com.example.hot6novelcraft.domain.payment.dto.request.PaymentCancelRequest;
 import com.example.hot6novelcraft.domain.payment.dto.request.PaymentConfirmRequest;
 import com.example.hot6novelcraft.domain.payment.dto.request.PaymentPrepareRequest;
+import com.example.hot6novelcraft.domain.payment.dto.response.PaymentHistoryResponse;
 import com.example.hot6novelcraft.domain.payment.dto.response.PaymentPrepareResponse;
 import com.example.hot6novelcraft.domain.payment.dto.response.PaymentResponse;
 import com.example.hot6novelcraft.domain.payment.service.PaymentService;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+@Validated
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
 public class PaymentController {
 
     private final PaymentService paymentService;
+
+    /**
+     * 내 결제 내역 목록 조회 (최신순, 페이징)
+     * GET /api/payments?page=0&size=10
+     */
+    @GetMapping
+    public ResponseEntity<BaseResponse<PageResponse<PaymentHistoryResponse>>> getPaymentHistory(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @RequestParam(defaultValue = "1") @Min(1) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size
+    ) {
+        Long userId = userDetails.getUser().getId();
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        PageResponse<PaymentHistoryResponse> response = paymentService.getPaymentHistory(userId, pageable);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(BaseResponse.success(HttpStatus.OK.name(), "결제 내역 조회 성공", response));
+    }
 
     /**
      * 결제 준비 — 결제창 열기 전 PENDING Payment 미리 생성

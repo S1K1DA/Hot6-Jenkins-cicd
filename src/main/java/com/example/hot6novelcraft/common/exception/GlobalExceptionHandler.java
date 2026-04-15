@@ -1,6 +1,7 @@
 package com.example.hot6novelcraft.common.exception;
 
 import com.example.hot6novelcraft.common.dto.BaseResponse;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -77,5 +78,12 @@ public class GlobalExceptionHandler {
         log.error("필수 파라미터 누락 : ", e);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(BaseResponse.fail(HttpStatus.BAD_REQUEST.name(), "필수 파라미터가 누락되었습니다"));
+    }
+
+    @ExceptionHandler(value = ConstraintViolationException.class)
+    public ResponseEntity<BaseResponse<Void>> ConstraintViolationExceptionHandler(ConstraintViolationException e) {
+        log.error("요청 파라미터 유효성 에러 발생 : ", e);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(BaseResponse.fail(HttpStatus.BAD_REQUEST.name(), "요청 파라미터가 유효하지 않습니다"));
     }
 }

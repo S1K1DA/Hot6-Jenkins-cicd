@@ -13,6 +13,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.hot6novelcraft.domain.user.entity.User;
+import com.example.hot6novelcraft.domain.user.entity.userEnum.UserRole;
+import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
+
 @Service
 @RequiredArgsConstructor
 public class NovelService {
@@ -21,12 +25,17 @@ public class NovelService {
 
     // 소설 등록
     @Transactional
-    public NovelCreateResponse createNovel(NovelCreateRequest request) {
+    public NovelCreateResponse createNovel(NovelCreateRequest request, UserDetailsImpl userDetails) {
 
-        // TODO : JWT 구현후 작가ID로 교체 및 작가 권한 확인 예정임다!!!!!!!
+        User user = userDetails.getUser();
+
+        // 작가 권한 확인
+        if (user.getRole() != UserRole.AUTHOR) {
+            throw new ServiceErrorException(NovelExceptionEnum.NOVEL_AUTHOR_FORBIDDEN);
+        }
 
         Novel novel = Novel.createNovel(
-                1L,
+                user.getId(),
                 request.title(),
                 request.description(),
                 request.genre().toString(),
@@ -41,14 +50,18 @@ public class NovelService {
 
     // 소설 수정
     @Transactional
-    public NovelUpdateResponse updateNovel(Long novelId, NovelUpdateRequest request) {
+    public NovelUpdateResponse updateNovel(Long novelId, NovelUpdateRequest request, UserDetailsImpl userDetails) {
 
-        // 소설 조회 공통 메서드
-        Novel novel = findNovelById(novelId);
+        User user = userDetails.getUser();
 
-        // TODO : JWT 구현후 작가ID로 교체 및 작가 권한 확인 예정임다!!!!!!!
-        // 작가 권한 확인 (role = AUTHOR)
-        // 본인 소설 확인 (novel.getAuthorId() == 로그인한 유저 ID)
+        // 작가 권한 확인
+        if (user.getRole() != UserRole.AUTHOR) {
+            throw new ServiceErrorException(NovelExceptionEnum.NOVEL_FORBIDDEN);
+        }
+
+        // 소설 조회 공통 메서드(본인 소설 및 삭제여부)
+        Novel novel = findNovelById(novelId, user.getId());
+
 
         // 소설 수정
         novel.update(
@@ -63,14 +76,17 @@ public class NovelService {
 
     // 소설 삭제
     @Transactional
-    public NovelDeleteResponse deleteNovel(Long novelId) {
+    public NovelDeleteResponse deleteNovel(Long novelId, UserDetailsImpl userDetails) {
 
-        // 소설 조회 공통 메서드
-        Novel novel = findNovelById(novelId);
+        User user = userDetails.getUser();
 
-        // TODO : JWT 구현후 작가ID로 교체 및 작가 권한 확인 예정임다!!!!!!!
-        // 작가 권한 확인 (role = AUTHOR)
-        // 본인 소설 확인 (novel.getAuthorId() == 로그인한 유저 ID)
+        // 작가 권한 확인
+        if (user.getRole() != UserRole.AUTHOR) {
+            throw new ServiceErrorException(NovelExceptionEnum.NOVEL_FORBIDDEN);
+        }
+
+        // 소설 조회 공통 메서드(본인 소설 및 삭제여부)
+        Novel novel = findNovelById(novelId, user.getId());
 
         // 소설 삭제(소프트 딜리트)
         novel.delete();
@@ -78,15 +94,21 @@ public class NovelService {
         return NovelDeleteResponse.from(novel.getId());
     }
 
-    // 소설 조회 공통 메서드
-    private Novel findNovelById(Long novelId) {
+    // 소설 조회 공통 메서드(본인 소설 및 삭제여부)
+    private Novel findNovelById(Long novelId, Long userId) {
+
         Novel novel = novelRepository.findById(novelId)
                 .orElseThrow(() -> new ServiceErrorException(NovelExceptionEnum.NOVEL_NOT_FOUND));
 
+        // 삭제 여부
         if (novel.isDeleted()) {
             throw new ServiceErrorException(NovelExceptionEnum.NOVEL_ALREADY_DELETED);
         }
 
+        // 본인 소설 확인
+        if (!novel.getAuthorId().equals(userId)) {
+            throw new ServiceErrorException(NovelExceptionEnum.NOVEL_FORBIDDEN);
+        }
         return novel;
     }
 }

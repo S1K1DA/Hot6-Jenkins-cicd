@@ -12,6 +12,9 @@ import com.example.hot6novelcraft.domain.episode.entity.Episode;
 import com.example.hot6novelcraft.domain.episode.repository.EpisodeRepository;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
+import com.example.hot6novelcraft.domain.user.entity.User;
+import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
+import com.example.hot6novelcraft.domain.user.entity.userEnum.UserRole;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,17 +31,19 @@ public class EpisodeService {
 
     // 회차 생성
     @Transactional
-    public EpisodeCreateResponse createEpisode(Long novelId, EpisodeCreateRequest request) {
+    public EpisodeCreateResponse createEpisode(Long novelId, EpisodeCreateRequest request, UserDetailsImpl userDetails) {
 
-        // TODO : JWT 구현후 작가ID로 교체 및 작가 권한 확인 예정임다!!!!!!!
+        // 작가 권한 확인
+        validateAuthorRole(userDetails);
 
-        // 소설 조회
-        findNovelById(novelId);
+        // 소설 조회(본인 소설 및 삭제여부)
+        findNovelById(novelId, userDetails.getUser().getId());
 
         // 회차 번호 중복 확인(삭제된 회차 제외)
         if (episodeRepository.existsByNovelIdAndEpisodeNumberAndIsDeletedFalse(novelId, request.episodeNumber())) {
             throw new ServiceErrorException(EpisodeExceptionEnum.EPISODE_NUMBER_DUPLICATE);
         }
+
         // 회차 번호 순서 검증 (ex : 1,2,3 ...10)
         int lastEpisodeNumber = episodeRepository.countByNovelIdAndIsDeletedFalse(novelId);
         if (request.episodeNumber() != lastEpisodeNumber + 1) {
@@ -66,12 +71,16 @@ public class EpisodeService {
 
     // 회차 수정
     @Transactional
-    public EpisodeUpdateResponse updateEpisode(Long episodeId, EpisodeUpdateRequest request) {
+    public EpisodeUpdateResponse updateEpisode(Long episodeId, EpisodeUpdateRequest request, UserDetailsImpl userDetails) {
 
-        // TODO : JWT 구현후 작가ID로 교체 및 작가 권한 확인 예정임다!!!!!!!
+        // 작가 권한 확인
+        validateAuthorRole(userDetails);
 
         // 회차 조회
         Episode episode = findEpisodeById(episodeId);
+
+        // 본인 소설 회차인지 확인
+        findNovelById(episode.getNovelId(), userDetails.getUser().getId());
 
         // 회차 수정
         episode.update(request.title(), request.content());
@@ -81,12 +90,16 @@ public class EpisodeService {
 
     // 회차 삭제
     @Transactional
-    public EpisodeDeleteResponse deleteEpisode(Long episodeId) {
+    public EpisodeDeleteResponse deleteEpisode(Long episodeId, UserDetailsImpl userDetails) {
 
-        // TODO : JWT 구현후 작가ID로 교체 및 작가 권한 확인 예정임다!!!!!!!
+        // 작가 권한 확인
+        validateAuthorRole(userDetails);
 
         // 회차 조회
         Episode episode = findEpisodeById(episodeId);
+
+        // 본인 소설 회차인지 확인
+        findNovelById(episode.getNovelId(), userDetails.getUser().getId());
 
         // 마지막 회차만 삭제 가능
         if (episodeRepository.existsByNovelIdAndEpisodeNumberGreaterThanAndIsDeletedFalse(
@@ -100,8 +113,15 @@ public class EpisodeService {
         return EpisodeDeleteResponse.from(episode.getId());
     }
 
-    // 소설 조회 공통 메서드
-    private Novel findNovelById(Long novelId) {
+    // 작가 권한 확인 공통 메서드
+    private void validateAuthorRole(UserDetailsImpl userDetails) {
+        if (userDetails.getUser().getRole() != UserRole.AUTHOR) {
+            throw new ServiceErrorException(NovelExceptionEnum.NOVEL_FORBIDDEN);
+        }
+    }
+
+    // 소설 조회 공통 메서드(본인 소설 및 삭제여부)
+    private Novel findNovelById(Long novelId, Long userId) {
         Novel novel = novelRepository.findById(novelId)
                 .orElseThrow(() -> new ServiceErrorException(NovelExceptionEnum.NOVEL_NOT_FOUND));
 
@@ -109,8 +129,12 @@ public class EpisodeService {
             throw new ServiceErrorException(NovelExceptionEnum.NOVEL_ALREADY_DELETED);
         }
 
+        if (!novel.getAuthorId().equals(userId)) {
+            throw new ServiceErrorException(NovelExceptionEnum.NOVEL_FORBIDDEN);
+        }
         return novel;
     }
+
     // 회차 조회 공통 메서드
     private Episode findEpisodeById(Long episodeId) {
         Episode episode = episodeRepository.findById(episodeId)

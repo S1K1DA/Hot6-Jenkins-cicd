@@ -7,10 +7,12 @@ import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeCreateRespo
 import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeDeleteResponse;
 import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeUpdateResponse;
 import com.example.hot6novelcraft.domain.episode.service.EpisodeService;
+import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,9 +31,10 @@ public class EpisodeController {
     @PostMapping("/novels/{novelId}/episodes")
     public ResponseEntity<BaseResponse<EpisodeCreateResponse>> createEpisode(
             @PathVariable Long novelId,
-            @Valid @RequestBody EpisodeCreateRequest request
+            @Valid @RequestBody EpisodeCreateRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
-        EpisodeCreateResponse response = episodeService.createEpisode(novelId, request);
+        EpisodeCreateResponse response = episodeService.createEpisode(novelId, request, userDetails);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(BaseResponse.success("201", "회차 생성 성공", response));
@@ -44,9 +47,10 @@ public class EpisodeController {
     @PatchMapping("/episodes/{episodeId}")
     public ResponseEntity<BaseResponse<EpisodeUpdateResponse>> updateEpisode(
             @PathVariable Long episodeId,
-            @Valid @RequestBody EpisodeUpdateRequest request
+            @Valid @RequestBody EpisodeUpdateRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
-        EpisodeUpdateResponse response = episodeService.updateEpisode(episodeId, request);
+        EpisodeUpdateResponse response = episodeService.updateEpisode(episodeId, request, userDetails);
 
         return ResponseEntity.ok(
                 BaseResponse.success("200", "회차 수정 성공", response)
@@ -59,9 +63,10 @@ public class EpisodeController {
      */
     @DeleteMapping("/episodes/{episodeId}")
     public ResponseEntity<BaseResponse<EpisodeDeleteResponse>> deleteEpisode(
-            @PathVariable Long episodeId
+            @PathVariable Long episodeId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
-        EpisodeDeleteResponse response = episodeService.deleteEpisode(episodeId);
+        EpisodeDeleteResponse response = episodeService.deleteEpisode(episodeId, userDetails);
 
         return ResponseEntity.ok(
                 BaseResponse.success("200", "회차 삭제 성공", response)

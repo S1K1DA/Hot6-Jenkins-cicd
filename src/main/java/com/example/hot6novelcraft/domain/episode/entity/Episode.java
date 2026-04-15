@@ -46,6 +46,9 @@ public class Episode extends BaseEntity {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column
+    private LocalDateTime deletedAt;
+
     @Column(nullable = false)
     private Long likeCount = 0L;
 
@@ -99,5 +102,6 @@ public class Episode extends BaseEntity {
     // 삭제 (소프트 딜리트)
     public void delete() {
         this.isDeleted = true;
+        deletedAt = LocalDateTime.now();
     }
 }

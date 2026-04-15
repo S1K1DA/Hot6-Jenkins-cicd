@@ -8,6 +8,8 @@ import com.example.hot6novelcraft.domain.calendar.entity.ReadingStatus;
 import com.example.hot6novelcraft.domain.calendar.entity.RecordSource;
 import com.example.hot6novelcraft.common.exception.domain.CalendarExceptionEnum;
 import com.example.hot6novelcraft.domain.calendar.service.CalendarService;
+import com.example.hot6novelcraft.domain.user.entity.User;
+import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +22,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
@@ -36,6 +40,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc(addFilters = false)
 class CalendarControllerTest {
 
+    @MockBean
+    private com.example.hot6novelcraft.common.security.JwtUtil jwtUtil;
+
+    @MockBean
+    private com.example.hot6novelcraft.common.security.RedisUtil redisUtil;
+
+    @MockBean
+    private org.springframework.security.core.userdetails.UserDetailsService userDetailsService;
+
+    @MockBean
+    private com.example.hot6novelcraft.domain.user.service.UserCacheService userCacheService;
+
+    @MockBean
+    private UserDetailsImpl userDetails;
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -51,6 +70,16 @@ class CalendarControllerTest {
     void setUp() {
         objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
+
+        // Mock User 설정
+        User mockUser = mock(User.class);
+        given(mockUser.getId()).willReturn(1L);
+        given(userDetails.getUser()).willReturn(mockUser);
+
+        // SecurityContext에 인증 정보 주입
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(userDetails, null, List.of());
+        SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 
     private ReadingRecordCreateRequest validPlatformRequest() {

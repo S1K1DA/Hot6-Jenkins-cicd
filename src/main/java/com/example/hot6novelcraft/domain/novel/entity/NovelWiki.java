@@ -32,7 +32,6 @@ public class NovelWiki extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    @Column(nullable = false)
     private LocalDateTime updatedAt;
 
     @PrePersist
@@ -54,12 +53,6 @@ public class NovelWiki extends BaseEntity {
                 .title(title)
                 .content(content)
                 .build();
-    }
-
-    // 설정집 수정
-    public void update(String title, String content) {
-        if (title != null) this.title = title;
-        if (content != null) this.content = content;
     }
 
     @Builder

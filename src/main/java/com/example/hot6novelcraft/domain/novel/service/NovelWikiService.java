@@ -5,6 +5,7 @@ import com.example.hot6novelcraft.common.exception.domain.NovelExceptionEnum;
 import com.example.hot6novelcraft.common.exception.domain.NovelWikiExceptionEnum;
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelWikiCreateRequest;
 import com.example.hot6novelcraft.domain.novel.dto.response.NovelWikiCreateResponse;
+import com.example.hot6novelcraft.domain.novel.dto.response.NovelWikiDeleteResponse;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.entity.NovelWiki;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
@@ -45,6 +46,26 @@ public class NovelWikiService {
         NovelWiki savedWiki = novelWikiRepository.save(wiki);
 
         return NovelWikiCreateResponse.from(savedWiki.getId());
+    }
+
+    // 설정집 삭제 (하드딜리트)
+    @Transactional
+    public NovelWikiDeleteResponse deleteWiki(Long novelId, Long wikiId, UserDetailsImpl userDetails) {
+
+        // 작가 권한 확인
+        validateAuthorRole(userDetails);
+
+        // 소설 조회 (본인 소설 및 삭제여부)
+        findNovelById(novelId, userDetails.getUser().getId());
+
+        // 설정집 조회
+        NovelWiki wiki = novelWikiRepository.findById(wikiId)
+                .orElseThrow(() -> new ServiceErrorException(NovelWikiExceptionEnum.WIKI_NOT_FOUND));
+
+        // 설정집 삭제 (하드딜리트)
+        novelWikiRepository.delete(wiki);
+
+        return NovelWikiDeleteResponse.from(wikiId);
     }
 
     // 작가 권한 확인 공통 메서드

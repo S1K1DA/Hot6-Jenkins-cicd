@@ -1,6 +1,7 @@
 package com.example.hot6novelcraft.domain.novel.entity;
 
 import com.example.hot6novelcraft.common.entity.BaseEntity;
+import com.example.hot6novelcraft.domain.novel.entity.enums.NovelStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -88,5 +89,10 @@ public class Novel extends BaseEntity {
     // 소설 삭제 (소프트 딜리트)
     public void delete() {
         this.isDeleted = true;
+    }
+
+    // 소설 상태 변경 (연재중)
+    public void changeStatus(NovelStatus status) {
+        this.status = status;
     }
 }

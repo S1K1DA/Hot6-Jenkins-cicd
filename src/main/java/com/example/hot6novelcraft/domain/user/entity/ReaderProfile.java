@@ -1,7 +1,9 @@
 package com.example.hot6novelcraft.domain.user.entity;
 
 import com.example.hot6novelcraft.common.entity.BaseEntity;
+import com.example.hot6novelcraft.domain.user.entity.userEnum.ReadingGoal;
 import jakarta.persistence.*;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -19,8 +21,23 @@ public class ReaderProfile extends BaseEntity {
     private Long userId;
 
     @Column(nullable = false)
-    private String preferred_genres;
+    private String preferredGenres;
 
     @Enumerated(EnumType.STRING)
     private ReadingGoal readingGoal;
+
+    private ReaderProfile(Long userId, String preferredGenres, ReadingGoal readingGoal) {
+        this.userId = userId;
+        this.preferredGenres = preferredGenres;
+        this.readingGoal = readingGoal;
+    }
+
+    @Builder
+    public static ReaderProfile register(
+            Long userId
+            , String preferredGenres
+            , ReadingGoal readingGoal
+    ) {
+        return new ReaderProfile(userId, preferredGenres, readingGoal);
+    }
 }

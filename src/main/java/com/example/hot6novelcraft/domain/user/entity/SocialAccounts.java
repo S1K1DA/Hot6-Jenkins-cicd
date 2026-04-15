@@ -1,6 +1,7 @@
 package com.example.hot6novelcraft.domain.user.entity;
 
 import com.example.hot6novelcraft.common.entity.BaseEntity;
+import com.example.hot6novelcraft.domain.user.entity.userEnum.ProviderSns;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;

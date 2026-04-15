@@ -1,4 +1,4 @@
-package com.example.hot6novelcraft.domain.user.entity;
+package com.example.hot6novelcraft.domain.user.entity.userEnum;
 
 import lombok.Getter;
 

@@ -1,0 +1,103 @@
+package com.example.hot6novelcraft.domain.user.controller;
+
+import com.example.hot6novelcraft.common.dto.BaseResponse;
+import com.example.hot6novelcraft.domain.user.dto.request.*;
+import com.example.hot6novelcraft.domain.user.dto.response.*;
+import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
+import com.example.hot6novelcraft.domain.user.service.SignupService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/auth")
+public class SignupController {
+
+
+    private final SignupService signupService;
+
+    // ======== 중복 확인 ========
+    @GetMapping("/email/check")
+    public ResponseEntity<BaseResponse<Void>> checkEmail(
+            @RequestParam String email
+    ) {
+        signupService.checkEmail(email);
+
+        return ResponseEntity.ok(BaseResponse.success("200", "사용할 수 있는 이메일입니다", null));
+    }
+
+    @GetMapping("/nickname/check")
+    public ResponseEntity<BaseResponse<Void>> checkNickname(
+            @RequestParam String nickname
+    ) {
+        signupService.checkNickname(nickname);
+
+        return ResponseEntity.ok(BaseResponse.success("200", "사용할 수 있는 닉네임입니다", null));
+    }
+
+    // ======== 휴대폰 인증 ========
+    // TODO : 외부 API 연결
+
+    @PostMapping("/phone/send")
+    public ResponseEntity<BaseResponse<Void>> sendVerificationCode(
+            @Valid @RequestBody PhoneSendRequest request
+    ) {
+        return ResponseEntity.ok(BaseResponse.success("200","인증번호를 발송했습니다", null));
+    }
+
+    @PostMapping("/phone/verify")
+    public ResponseEntity<BaseResponse<Void>> phoneVerifyRequest(
+            @Valid @RequestBody PhoneVerifyRequest request
+    ) {
+        return ResponseEntity.ok(BaseResponse.success("200","인증번호가 성공적으로 확인되었습니다", null));
+    }
+
+    /* ======== 회원 가입 ========
+    1. 공통 회원가입 - 일반 이메일 가입
+    2. 독자 회원가입 - 독자 추가 정보 기입
+    3. 작가 회원가입 - 작가 추가 정보 기입
+    4. TODO!! 소셜 회원가입
+    5. 관리자 회원가입 - 이메일, 비밀번호, 핸드폰 인증만 진행
+    ============================= */
+
+    @PostMapping("/signup")
+    public ResponseEntity<BaseResponse<CommonSignupResponse>> signup(
+            @Valid @RequestBody CommonSignupRequest request
+    ) {
+        String tempToken = signupService.commonSignup(request);
+        return ResponseEntity.ok(BaseResponse.success("200", "입력 정보가 확인되었습니다", CommonSignupResponse.of(tempToken)));
+    }
+
+    @PostMapping("/signup/reader")
+    public ResponseEntity<BaseResponse<SignupResponse>> readerSignup(
+            @Valid @RequestBody ReaderSignupRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        SignupResponse response = signupService.readerSignup(request, userDetails.getUsername());
+        return ResponseEntity.status(HttpStatus.CREATED).body(BaseResponse.success("201","회원가입이 완료되었습니다", response));
+    }
+
+    @PostMapping("/signup/author")
+    public ResponseEntity<BaseResponse<SignupResponse>> authorSignup(
+            @Valid @RequestBody AuthorSignupRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        SignupResponse response = signupService.authorSignup(request, userDetails.getUsername());
+        return ResponseEntity.status(HttpStatus.CREATED).body(BaseResponse.success("201", "작가 회원가입이 완료되었습니다", response));
+    }
+
+    // TODO : 소셜 회원가입 로직 추가 예정!!!!
+
+    @PostMapping("/signup/admin")
+    public ResponseEntity<BaseResponse<AdminSignupResponse>> adminSignup(
+            @Valid @RequestBody AdminSignupRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ){
+        AdminSignupResponse response = signupService.adminSignup(request, userDetails.getUsername());
+        return ResponseEntity.status(HttpStatus.CREATED).body(BaseResponse.success("201", "관리자 권한으로 회원가입이 완료되었습니다.", response));
+    }
+}

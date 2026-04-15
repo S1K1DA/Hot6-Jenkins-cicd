@@ -1,6 +1,7 @@
-package com.example.hot6novelcraft.domain.chatmessage;
+package com.example.hot6novelcraft.domain.chatmessage.entity;
 
 import com.example.hot6novelcraft.common.entity.BaseEntity;
+import com.example.hot6novelcraft.domain.chatmessage.entity.enums.MessageType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -25,7 +26,7 @@ public class ChatMessage extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    private String file_url;
+    private String fileUrl;
 
     @Column(nullable = false)
     @Enumerated(value = EnumType.STRING)

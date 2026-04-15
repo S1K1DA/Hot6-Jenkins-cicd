@@ -46,6 +46,12 @@ public class SecurityConfig {
                         , "/api/auth/nickname/check"
                         , "/api/auth/phone/send"
                         , "/api/auth/phone/verify"
+                        , "/api/webhooks/portone"
+                        , "/*.html"
+                        , "/static/**"
+                        , "/css/**"
+                        , "/js/**"
+                        , "/images/**"
                         ).permitAll()
                                 .requestMatchers("/api/calendars/**").hasAnyAuthority("READER", "AUTHOR")
                 .anyRequest().authenticated()

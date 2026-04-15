@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Entity
 @NoArgsConstructor
@@ -25,6 +27,11 @@ public class ReaderProfile extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     private ReadingGoal readingGoal;
+
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+
+    private LocalDateTime deletedAt;
 
     private ReaderProfile(Long userId, String preferredGenres, ReadingGoal readingGoal) {
         this.userId = userId;

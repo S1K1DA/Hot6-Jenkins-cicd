@@ -13,7 +13,6 @@ import java.util.stream.Collectors;
 public record AuthorSignupRequest(
 
     @NotEmpty(message = "주력 장르 선택은 필수입니다.")
-    @Size(min = 1, message = "주력 장르는 최소 1개 이상 선택해야합니다.")
     List<MainGenre> genres,
 
     @NotBlank
@@ -21,7 +20,6 @@ public record AuthorSignupRequest(
     String bio,
 
     @NotNull
-    @Size(max = 1, message = "작가 경력사항은 필수 사항입니다.")
     CareerLevel careerLevel,
 
     String instagramLinks,

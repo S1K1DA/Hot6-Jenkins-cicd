@@ -19,4 +19,12 @@ public abstract class BaseEntity {
     @Column(updatable = false)
     @Temporal(TemporalType.TIMESTAMP)
     private LocalDateTime createdAt;
+
+    @Column(updatable = false)
+    @Temporal(TemporalType.TIMESTAMP)
+    private LocalDateTime updatedAt;
+
+    @Column(updatable = false)
+    @Temporal(TemporalType.TIMESTAMP)
+    private LocalDateTime deletedAt;
 }

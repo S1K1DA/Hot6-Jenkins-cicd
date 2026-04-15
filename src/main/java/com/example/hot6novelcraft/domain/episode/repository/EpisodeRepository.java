@@ -14,5 +14,9 @@ public interface EpisodeRepository extends JpaRepository<Episode, Long>, CustomE
     // 해당 회차보다 큰 회차 번호가 존재하는지 확인(중간 회차 삭제 못하게!)
     boolean existsByNovelIdAndEpisodeNumberGreaterThanAndIsDeletedFalse(Long novelId, int episodeNumber);
 
+    //내서재 담기에서 사용
+    long countByNovelId(Long novelId);
+
+
 
 }

@@ -8,8 +8,10 @@ import com.example.hot6novelcraft.domain.webhookevent.entity.WebhookEvent;
 import com.example.hot6novelcraft.domain.webhookevent.entity.WebhookEventType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.portone.sdk.server.payment.CancelledPayment;
 import io.portone.sdk.server.payment.FailedPayment;
 import io.portone.sdk.server.payment.PaidPayment;
+import io.portone.sdk.server.payment.PartialCancelledPayment;
 import io.portone.sdk.server.payment.PaymentClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -114,6 +116,10 @@ public class WebhookService {
             // PortOne에서 결제 실패로 확인 → PENDING이면 FAILED로 전환 (포인트 변동 없음)
             webhookTransactionService.failPendingPayment(webhookEvent.getId(), payment.getId());
             log.info("웹훅 결제 실패 처리 완료 paymentId={}", paymentId);
+        } else if (portOnePayment instanceof CancelledPayment || portOnePayment instanceof PartialCancelledPayment) {
+            // 결제창 열림 후 완료 전 취소된 케이스 (PortOne 타임아웃 등) → PENDING이면 FAILED로 전환
+            webhookTransactionService.failPendingPayment(webhookEvent.getId(), payment.getId());
+            log.info("웹훅 결제 취소 처리 완료 (PENDING 상태) paymentId={}", paymentId);
         } else {
             log.warn("웹훅 알 수 없는 상태 paymentId={} portOneType={}", paymentId, portOnePayment.getClass().getSimpleName());
             webhookTransactionService.markEventFailed(webhookEvent.getId(),

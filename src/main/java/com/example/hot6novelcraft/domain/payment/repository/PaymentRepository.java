@@ -30,4 +30,15 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     int completeIfPending(@Param("id") Long id,
                           @Param("status") PaymentStatus status,
                           @Param("method") PaymentMethod method);
+
+    /**
+     * COMPLETED 상태인 경우에만 REFUNDED로 전환한다.
+     * 중복 환불 요청이 동시에 들어와도 먼저 성공한 쪽만 1을 반환하고,
+     * 나머지는 0을 반환하여 포인트 중복 차감을 원자적으로 방지한다.
+     *
+     * @return 업데이트된 행 수 (1이면 처리 성공, 0이면 이미 처리됨)
+     */
+    @Modifying
+    @Query("UPDATE Payment p SET p.status = 'REFUNDED', p.cancelledAt = CURRENT_TIMESTAMP WHERE p.id = :id AND p.status = 'COMPLETED'")
+    int cancelIfCompleted(@Param("id") Long id);
 }

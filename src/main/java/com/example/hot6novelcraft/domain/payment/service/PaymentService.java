@@ -98,9 +98,10 @@ public class PaymentService {
      *
      * 흐름:
      * 1. [TX-readOnly] 결제 조회 + 환불 가능 상태 검증
-     * 2. 포인트 잔액 검증 (충전 금액 전액이 남아있어야 환불 가능)
+     * 2. [TX] 포인트 선차감 — 잔액 부족 시 여기서 실패하여 PortOne 미호출
      * 3. [외부 API] 포트원 V2 SDK로 환불 요청
-     * 4. [TX] REFUNDED 전환 + 포인트 차감
+     *    - 실패 시 → 선차감한 포인트 복구 후 에러 반환 (보상 트랜잭션)
+     * 4. [TX] REFUNDED 전환 (포인트는 이미 차감됨)
      */
     public PaymentResponse cancelPayment(Long userId, Long paymentId, String reason) {
         log.info("[환불] 요청 시작 userId={} paymentId={} reason={}", userId, paymentId, reason);
@@ -110,14 +111,9 @@ public class PaymentService {
         log.info("[환불] 결제 조회 완료 paymentKey={} status={} amount={}",
                 payment.getPaymentKey(), payment.getStatus(), payment.getAmount());
 
-        // 2. 포인트 잔액 검증 — PortOne 호출 전에 수행해야 함
-        // 충전 후 일부 사용한 경우 잔액이 충전 금액보다 적을 수 있으므로 환불 불가 처리
-        long currentBalance = pointService.getBalance(userId);
-        if (currentBalance < payment.getAmount()) {
-            log.warn("[환불] 포인트 잔액 부족 환불 불가 userId={} 잔액={}P 결제금액={}P",
-                    userId, currentBalance, payment.getAmount());
-            throw new ServiceErrorException(PaymentExceptionEnum.ERR_INSUFFICIENT_POINT);
-        }
+        // 2. 포인트 선차감 — 잔액 부족 시 여기서 실패, PortOne 미호출
+        pointService.deduct(userId, payment.getAmount());
+        log.info("[환불] 포인트 선차감 완료 userId={} amount={}P", userId, payment.getAmount());
 
         try {
             // 3. 포트원 SDK 환불 요청 (트랜잭션 밖 — DB 커넥션 미점유)
@@ -125,14 +121,15 @@ public class PaymentService {
                     reason, null, null, null, null, null, null).get();
             log.info("[환불] 포트원 환불 완료 paymentKey={}", payment.getPaymentKey());
         } catch (Exception e) {
-            log.error("[환불] 포트원 환불 실패 paymentKey={}", payment.getPaymentKey(), e);
+            // 보상: PortOne 실패 시 선차감한 포인트 복구
+            pointService.compensateDeduct(userId, payment.getAmount());
+            log.error("[환불] 포트원 환불 실패 → 포인트 복구 완료 userId={} amount={}P paymentKey={}",
+                    userId, payment.getAmount(), payment.getPaymentKey(), e);
             throw new ServiceErrorException(PaymentExceptionEnum.ERR_PORTONE_API_ERROR);
         }
 
-        // 4. REFUNDED 전환 + 포인트 차감 (짧은 트랜잭션)
-        Payment cancelledPayment = paymentTransactionService.finalizeCancel(
-                payment.getId(), userId, payment.getAmount()
-        );
+        // 4. REFUNDED 전환 (포인트는 이미 차감됨, 짧은 트랜잭션)
+        Payment cancelledPayment = paymentTransactionService.finalizeCancel(payment.getId());
         log.info("[환불] 환불 프로세스 완료 userId={} dbPaymentId={}", userId, paymentId);
         return PaymentResponse.from(cancelledPayment);
     }

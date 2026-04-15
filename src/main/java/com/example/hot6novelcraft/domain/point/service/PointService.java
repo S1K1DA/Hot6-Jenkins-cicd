@@ -54,6 +54,21 @@ public class PointService {
     }
 
     /**
+     * 포인트 복구 (환불 진행 중 PortOne 오류 발생 시 선차감된 포인트 보상)
+     */
+    @Transactional
+    public void compensateDeduct(Long userId, Long amount) {
+        Point point = pointRepository.findByUserId(userId)
+                .orElseGet(() -> pointRepository.save(Point.create(userId)));
+
+        point.charge(amount);
+
+        pointHistoryRepository.save(
+                PointHistory.create(userId, null, null, amount, PointHistoryType.CHARGE, "환불 오류 복구")
+        );
+    }
+
+    /**
      * 포인트 잔액 조회
      */
     @Transactional(readOnly = true)

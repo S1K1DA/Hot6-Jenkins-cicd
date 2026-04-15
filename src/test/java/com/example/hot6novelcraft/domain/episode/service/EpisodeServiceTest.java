@@ -5,8 +5,10 @@ import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeCreateReques
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeUpdateRequest;
 import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeCreateResponse;
 import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeDeleteResponse;
+import com.example.hot6novelcraft.domain.episode.dto.response.EpisodePublishResponse;
 import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeUpdateResponse;
 import com.example.hot6novelcraft.domain.episode.entity.Episode;
+import com.example.hot6novelcraft.domain.episode.entity.EpisodeStatus;
 import com.example.hot6novelcraft.domain.episode.repository.EpisodeRepository;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
@@ -280,5 +282,93 @@ class EpisodeServiceTest {
 
         assertThrows(ServiceErrorException.class,
                 () -> episodeService.deleteEpisode(1L, userDetails));
+    }
+
+    // ==================== 회차 발행 ====================
+
+    @Test
+    void 회차발행_정상이면_성공() {
+        UserDetailsImpl userDetails = 작가();
+        Episode episode = 회차(1L, 1);
+        Novel novel = 소설(1L);
+
+        given(episode.getStatus()).willReturn(EpisodeStatus.DRAFT);
+        given(episode.getContent()).willReturn("본문 내용");
+        given(episodeRepository.findById(1L)).willReturn(Optional.of(episode));
+        given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
+        given(episodeRepository.existsByNovelIdAndEpisodeNumberLessThanAndStatusNotAndIsDeletedFalse(
+                1L, 1, EpisodeStatus.PUBLISHED)).willReturn(false);
+
+        EpisodePublishResponse response = episodeService.publishEpisode(1L, userDetails);
+
+        assertEquals(episode.getId(), response.episodeId());
+    }
+
+    @Test
+    void 회차발행_작가권한없으면_실패() {
+        UserDetailsImpl userDetails = 독자();
+
+        assertThrows(ServiceErrorException.class,
+                () -> episodeService.publishEpisode(1L, userDetails));
+    }
+
+    @Test
+    void 회차발행_이미발행된회차이면_실패() {
+        UserDetailsImpl userDetails = 작가();
+        Episode episode = 회차(1L, 1);
+        Novel novel = 소설(1L);
+
+        given(episode.getStatus()).willReturn(EpisodeStatus.PUBLISHED);
+        given(episodeRepository.findById(1L)).willReturn(Optional.of(episode));
+        given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
+
+        assertThrows(ServiceErrorException.class,
+                () -> episodeService.publishEpisode(1L, userDetails));
+    }
+
+    @Test
+    void 회차발행_본문없으면_실패() {
+        UserDetailsImpl userDetails = 작가();
+        Episode episode = 회차(1L, 1);
+        Novel novel = 소설(1L);
+
+        given(episode.getStatus()).willReturn(EpisodeStatus.DRAFT);
+        given(episode.getContent()).willReturn(null);
+        given(episodeRepository.findById(1L)).willReturn(Optional.of(episode));
+        given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
+
+        assertThrows(ServiceErrorException.class,
+                () -> episodeService.publishEpisode(1L, userDetails));
+    }
+
+    @Test
+    void 회차발행_이전회차미발행이면_실패() {
+        UserDetailsImpl userDetails = 작가();
+        Episode episode = 회차(1L, 3); // 3화
+        Novel novel = 소설(1L);
+
+        given(episode.getStatus()).willReturn(EpisodeStatus.DRAFT);
+        given(episode.getContent()).willReturn("본문 내용");
+        given(episodeRepository.findById(1L)).willReturn(Optional.of(episode));
+        given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
+        given(episodeRepository.existsByNovelIdAndEpisodeNumberLessThanAndStatusNotAndIsDeletedFalse(
+                1L, 3, EpisodeStatus.PUBLISHED)).willReturn(true); // 이전 회차 미발행
+
+        assertThrows(ServiceErrorException.class,
+                () -> episodeService.publishEpisode(1L, userDetails));
+    }
+
+    @Test
+    void 회차발행_본인소설아니면_실패() {
+        UserDetailsImpl userDetails = 작가(); // userId = 1L
+        Episode episode = 회차(1L, 1);
+        Novel novel = 소설(2L); // authorId = 2L
+
+        given(episode.getStatus()).willReturn(EpisodeStatus.DRAFT);
+        given(episodeRepository.findById(1L)).willReturn(Optional.of(episode));
+        given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
+
+        assertThrows(ServiceErrorException.class,
+                () -> episodeService.publishEpisode(1L, userDetails));
     }
 }

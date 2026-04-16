@@ -1,10 +1,7 @@
 package com.example.hot6novelcraft.domain.user.controller;
 
 import com.example.hot6novelcraft.common.dto.BaseResponse;
-import com.example.hot6novelcraft.domain.user.dto.request.AuthorRequest;
-import com.example.hot6novelcraft.domain.user.dto.request.CommonUpdateRequest;
-import com.example.hot6novelcraft.domain.user.dto.request.LoginUserRequest;
-import com.example.hot6novelcraft.domain.user.dto.request.ReaderUpdatedRequest;
+import com.example.hot6novelcraft.domain.user.dto.request.*;
 import com.example.hot6novelcraft.domain.user.dto.response.*;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import com.example.hot6novelcraft.domain.user.service.AuthService;
@@ -74,8 +71,12 @@ public class AuthController {
     }
 
     @PatchMapping("/users/me/password")
-    public ResponseEntity<BaseResponse<Void>> updatePassword() {
-        return ResponseEntity.ok(BaseResponse.success("200", "비밀번호가 변경되었습니다", null));
+    public ResponseEntity<BaseResponse<Void>> updatePassword(
+            @Valid @RequestBody PasswordUpdateRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        authService.updatePassword(request.oldPassword(), request.newPassword(), userDetails);
+        return ResponseEntity.ok(BaseResponse.success("200", "비밀번호가 변경되었습니다",null));
     }
 
     @PostMapping("/logout")

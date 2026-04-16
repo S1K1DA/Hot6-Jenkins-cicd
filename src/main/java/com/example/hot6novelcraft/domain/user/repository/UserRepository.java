@@ -15,7 +15,7 @@ public interface UserRepository extends JpaRepository <User, Long> {
     Optional<User> findByIdAndIsDeletedFalse(Long id);
 
     // 탈퇴 유저 원본 이메일로 조회
-    @Query("SELECT u FROM User u WHERE u.email LIKE concat(:email, '_Deleted_%')And u.isDeleted = true")
+    @Query("SELECT u FROM User u WHERE u.email LIKE concat(:email, '\\_Deleted\\_%') ESCAPE '\\' AND u.isDeleted = true")
             Optional<User> findDeletedUserByOriginalEmail(@Param("email") String email);
 
     // 닉네임 중복 확인 (본인 제외)

@@ -24,7 +24,7 @@ public class UserDetailsImpl implements UserDetails, OAuth2User {
     // 소셜 로그인용 생성자 - 구글에서 받은 정보 담김
     public UserDetailsImpl(User user, Map<String, Object> attributes) {
         this.user = user;
-        this.attributes = attributes;
+        this.attributes = (attributes == null) ? Collections.emptyMap() : Map.copyOf(attributes);
     }
 
     // Security 밖에서 User 객체 꺼냄

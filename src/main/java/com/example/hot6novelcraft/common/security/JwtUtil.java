@@ -18,12 +18,8 @@ import java.util.Date;
 public class JwtUtil {
 
     public static final String BEARER_PREFIX = "Bearer ";
-//    private static final long ACCESS_TOKEN_TIME = 60 * 60 * 1000L; // 토큰 발급 유효 60분
-//    private static final long REFRESH_TOKEN_TIME = 14 * 24 * 60 * 60 * 1000L; // RT 발급 유효 2주
-//    private static final long TEMP_TOKEN_TIME = 10 * 60 * 1000L; // 임시 토큰 10분
-//    private static final long SOCIAL_TOKEN_TIME = 10 * 60 * 1000L; // 소셜 가입용 10분
 
-    // TODO ==== 포스트맨 테스트용 TTL - 최종 배포 전 삭제하기!!! =====
+    // 테스트용 배포 전에 바꾸기
     private static final long ACCESS_TOKEN_TIME = 5 * 60 * 1000L; // 토큰 발급 유효 5분
     private static final long REFRESH_TOKEN_TIME = 10 * 60 * 1000L; // RT 발급 유효 10분
     private static final long TEMP_TOKEN_TIME = 5 * 60 * 1000L; // 임시 토큰 5분

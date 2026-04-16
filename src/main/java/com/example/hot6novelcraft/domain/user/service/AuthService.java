@@ -109,8 +109,6 @@ public class AuthService {
 
         user.update(request.nickname(), request.phoneNo());
 
-        log.info("[공통 회원정보 수정] email = {} ", user.getEmail());
-
         return CommonUpdateResponse.of(user);
     }
 

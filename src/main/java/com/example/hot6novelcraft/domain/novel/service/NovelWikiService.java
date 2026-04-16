@@ -12,7 +12,7 @@ import com.example.hot6novelcraft.domain.novel.entity.NovelWiki;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
 import com.example.hot6novelcraft.domain.novel.repository.NovelWikiRepository;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
-import com.example.hot6novelcraft.domain.user.entity.userEnum.UserRole;
+import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;

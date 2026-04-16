@@ -11,7 +11,7 @@ import com.example.hot6novelcraft.domain.novel.entity.enums.NovelStatus;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
 import com.example.hot6novelcraft.domain.user.entity.User;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
-import com.example.hot6novelcraft.domain.user.entity.userEnum.UserRole;
+import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import com.example.hot6novelcraft.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

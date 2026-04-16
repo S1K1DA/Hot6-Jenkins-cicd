@@ -14,7 +14,7 @@ import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
 import com.example.hot6novelcraft.domain.user.entity.User;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
-import com.example.hot6novelcraft.domain.user.entity.userEnum.UserRole;
+import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

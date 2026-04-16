@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
+
 import java.net.URI;
 import java.util.List;
 
@@ -29,7 +30,7 @@ public class NationalLibraryApiClient {
 
     private static final String NL_BASE_URL = "https://www.nl.go.kr";
 
-    public List<NationalLibraryApiItem> searchBooks(String query, int page, int size) {
+    public NationalLibraryApiResponse searchBooks(String query, int page, int size) {
         try {
             URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
                     .queryParam("key", apiKey)
@@ -42,23 +43,26 @@ public class NationalLibraryApiClient {
                     .encode()
                     .toUri();
 
-            log.info("국립중앙도서관 API 호출 URI: {}", uri);
+            log.debug("국립중앙도서관 API 호출 URI: {}",
+                    uri.toString().replace(apiKey, "****"));
 
             String rawResponse = restTemplate.getForObject(uri, String.class);
-            log.info("국립중앙도서관 API 원본 응답: {}", rawResponse);
+
+            log.debug("국립중앙도서관 API 원본 응답: {}", rawResponse);
 
             if (rawResponse == null || rawResponse.isBlank()) {
-                return List.of();
+                return new NationalLibraryApiResponse(0, List.of());
             }
 
             NationalLibraryApiResponse response =
                     objectMapper.readValue(rawResponse, NationalLibraryApiResponse.class);
 
             if (response == null || response.result() == null) {
-                return List.of();
+                return new NationalLibraryApiResponse(0, List.of());
             }
 
-            return response.result().stream()
+            // stripHtml, resolveUrl 처리 후 새 response 반환
+            List<NationalLibraryApiItem> processedItems = response.result().stream()
                     .map(item -> new NationalLibraryApiItem(
                             item.isbn(),
                             stripHtml(item.title()),
@@ -69,6 +73,8 @@ public class NationalLibraryApiClient {
                             item.imageUrl()
                     ))
                     .toList();
+
+            return new NationalLibraryApiResponse(response.total(), processedItems);
 
         } catch (Exception e) {
             log.error("국립중앙도서관 API 호출 실패: {}", e.getMessage());

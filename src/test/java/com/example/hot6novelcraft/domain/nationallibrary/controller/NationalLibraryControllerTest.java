@@ -68,7 +68,7 @@ class NationalLibraryControllerTest {
         var mockUser = mock(com.example.hot6novelcraft.domain.user.entity.User.class);
         given(mockUser.getId()).willReturn(USER_ID);
         given(mockUser.getRole()).willReturn(
-                com.example.hot6novelcraft.domain.user.entity.userEnum.UserRole.READER
+                com.example.hot6novelcraft.domain.user.entity.enums.UserRole.READER
         );
         given(mockUser.getPassword()).willReturn("password");
         given(mockUser.getEmail()).willReturn("test@test.com");

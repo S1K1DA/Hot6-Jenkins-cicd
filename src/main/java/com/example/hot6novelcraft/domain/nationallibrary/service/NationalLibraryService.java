@@ -10,6 +10,7 @@ import com.example.hot6novelcraft.domain.nationallibrary.dto.response.*;
 import com.example.hot6novelcraft.domain.nationallibrary.entity.Book;
 import com.example.hot6novelcraft.domain.nationallibrary.entity.UserBook;
 import com.example.hot6novelcraft.domain.nationallibrary.infrastructure.NationalLibraryApiClient;
+import com.example.hot6novelcraft.domain.nationallibrary.infrastructure.NationalLibraryApiResponse;
 import com.example.hot6novelcraft.domain.nationallibrary.repository.BookRepository;
 import com.example.hot6novelcraft.domain.nationallibrary.repository.UserBookRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,7 +33,7 @@ public class NationalLibraryService {
     private final NationalLibraryApiClient apiClient;
     private final BookRepository bookRepository;
     private final RedisTemplate<String, Object> redisTemplate;
-    private final UserBookRepository  userBookRepository;
+    private final UserBookRepository userBookRepository;
 
     private static final String SEARCH_CACHE_PREFIX = "book:search:";
     private static final Duration SEARCH_CACHE_TTL  = Duration.ofMinutes(10);
@@ -50,20 +52,27 @@ public class NationalLibraryService {
             return result;
         }
 
-        List<NationalLibraryApiItem> items =
+        // ApiClient에서 response 전체를 받아 total 정보 활용
+        NationalLibraryApiResponse response =
                 apiClient.searchBooks(request.query(), request.page(), request.size());
 
-        List<NationalLibraryBookResponse> content = items.stream()
+        List<NationalLibraryBookResponse> content = response.result() == null
+                ? List.of()
+                : response.result().stream()
                 .map(NationalLibraryBookResponse::from)
                 .toList();
+
+        long total = response.total();
+        int totalPages = (int) Math.ceil((double) total / request.size());
+        boolean isLast = (long) request.page() * request.size() >= total;
 
         PageResponse<NationalLibraryBookResponse> result = new PageResponse<>(
                 content,
                 request.page() - 1,
-                (int) Math.ceil((double) content.size() / request.size()),
-                content.size(),
+                totalPages,
+                total,
                 request.size(),
-                content.size() < request.size()
+                isLast
         );
 
         redisTemplate.opsForValue().set(cacheKey, result, SEARCH_CACHE_TTL);
@@ -88,6 +97,7 @@ public class NationalLibraryService {
                         new ServiceErrorException(NationalLibraryExceptionEnum.BOOK_NOT_FOUND));
         return BookResponse.from(book);
     }
+
     // 내 서재에 도서 저장
     @Transactional
     public UserBookResponse saveUserBook(Long userId, UserBookSaveRequest request) {
@@ -100,7 +110,7 @@ public class NationalLibraryService {
                                 request.author(),
                                 request.publisher(),
                                 request.publishYear(),
-                                request.coverImageUrl()   // ← 추가
+                                request.coverImageUrl()
                         ))
                 ));
 
@@ -112,6 +122,8 @@ public class NationalLibraryService {
 
         return UserBookResponse.of(userBook, book);
     }
+
+    // 내 서재 목록 조회
     @Transactional(readOnly = true)
     public List<MyShelfResponse> getMyShelf(Long userId) {
 
@@ -124,7 +136,9 @@ public class NationalLibraryService {
         Map<Long, Book> bookMap = bookRepository.findAllById(bookIds).stream()
                 .collect(Collectors.toMap(Book::getId, book -> book));
 
+        // Book이 삭제된 경우 NPE 방어를 위해 null 체크 추가
         return userBooks.stream()
+                .filter(userBook -> Objects.nonNull(bookMap.get(userBook.getBookId())))
                 .map(userBook -> MyShelfResponse.of(userBook, bookMap.get(userBook.getBookId())))
                 .toList();
     }

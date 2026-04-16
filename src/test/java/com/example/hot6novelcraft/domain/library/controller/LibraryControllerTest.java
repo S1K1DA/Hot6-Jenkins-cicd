@@ -8,6 +8,7 @@ import com.example.hot6novelcraft.domain.library.dto.response.LibraryAddResponse
 import com.example.hot6novelcraft.domain.library.dto.response.LibraryListResponse;
 import com.example.hot6novelcraft.domain.library.entity.enums.LibraryType;
 import com.example.hot6novelcraft.domain.library.service.LibraryService;
+import com.example.hot6novelcraft.domain.nationallibrary.service.NationalLibraryService;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -43,6 +44,7 @@ class LibraryControllerTest {
 
     @InjectMocks private LibraryController libraryController;
     @Mock        private LibraryService    libraryService;
+    @Mock        private NationalLibraryService nationalLibraryService;
 
     private MockMvc mockMvc;
 
@@ -72,7 +74,7 @@ class LibraryControllerTest {
         var mockUser = mock(com.example.hot6novelcraft.domain.user.entity.User.class);
         given(mockUser.getId()).willReturn(USER_ID);
         given(mockUser.getRole()).willReturn(
-                com.example.hot6novelcraft.domain.user.entity.userEnum.UserRole.READER
+                com.example.hot6novelcraft.domain.user.entity.enums.UserRole.READER
         );
         given(mockUser.getPassword()).willReturn("password");
         given(mockUser.getEmail()).willReturn("test@test.com");
@@ -156,6 +158,11 @@ class LibraryControllerTest {
     @DisplayName("GET /api/libraries/me - 내서재 조회")
     class GetMyLibrary {
 
+        @BeforeEach
+        void setUpShelf() {
+            given(nationalLibraryService.getMyShelf(eq(USER_ID))).willReturn(List.of());
+        }
+
         private final LibraryListResponse item = new LibraryListResponse(
                 45L, "테스트소설", "작가명", "https://cover.png",
                 "12화: 예외 처리는 어려워", 120L, LocalDateTime.now()
@@ -175,8 +182,8 @@ class LibraryControllerTest {
                             .param("sort", "LATEST"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.data.content[0].novelId").value(45))
-                    .andExpect(jsonPath("$.data.totalElements").value(1));
+                    .andExpect(jsonPath("$.data.novels.content[0].novelId").value(45))     // ← 수정
+                    .andExpect(jsonPath("$.data.novels.totalElements").value(1));           // ← 수정
         }
 
         @Test
@@ -193,7 +200,7 @@ class LibraryControllerTest {
                             .param("size", "12")
                             .param("sort", "LATEST"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.content[0].novelId").value(45));
+                    .andExpect(jsonPath("$.data.novels.content[0].novelId").value(45));    // ← 수정
         }
 
         @Test
@@ -224,7 +231,7 @@ class LibraryControllerTest {
                             .param("size", "12")
                             .param("sort", "LATEST"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.totalElements").value(0));
+                    .andExpect(jsonPath("$.data.novels.totalElements").value(0));           // ← 수정
         }
     }
 }

@@ -13,6 +13,7 @@ import com.example.hot6novelcraft.domain.nationallibrary.dto.response.UserBookRe
 import com.example.hot6novelcraft.domain.nationallibrary.entity.Book;
 import com.example.hot6novelcraft.domain.nationallibrary.entity.UserBook;
 import com.example.hot6novelcraft.domain.nationallibrary.infrastructure.NationalLibraryApiClient;
+import com.example.hot6novelcraft.domain.nationallibrary.infrastructure.NationalLibraryApiResponse;
 import com.example.hot6novelcraft.domain.nationallibrary.repository.BookRepository;
 import com.example.hot6novelcraft.domain.nationallibrary.repository.UserBookRepository;
 import com.example.hot6novelcraft.common.dto.PageResponse;
@@ -85,7 +86,9 @@ class NationalLibraryServiceTest {
                     "9791193235447", "스프링", "온다 리쿠",
                     "클레이하우스", "2025", "https://www.nl.go.kr/...", ""
             );
-            given(apiClient.searchBooks("스프링", 1, 10)).willReturn(List.of(item));
+            // List.of(item) → NationalLibraryApiResponse로 변경
+            given(apiClient.searchBooks("스프링", 1, 10))
+                    .willReturn(new NationalLibraryApiResponse(1, List.of(item)));
 
             PageResponse<NationalLibraryBookResponse> result =
                     nationalLibraryService.searchBooks(request);
@@ -93,6 +96,7 @@ class NationalLibraryServiceTest {
             assertThat(result.content()).hasSize(1);
             assertThat(result.content().get(0).isbn()).isEqualTo("9791193235447");
             assertThat(result.content().get(0).title()).isEqualTo("스프링");
+            assertThat(result.totalElements()).isEqualTo(1L);
             then(apiClient).should().searchBooks("스프링", 1, 10);
             then(valueOperations).should().set(anyString(), any(), any());
         }
@@ -118,7 +122,9 @@ class NationalLibraryServiceTest {
         void searchBooks_emptyResult_returnsEmptyPage() {
             given(redisTemplate.opsForValue()).willReturn(valueOperations);
             given(valueOperations.get(anyString())).willReturn(null);
-            given(apiClient.searchBooks("스프링", 1, 10)).willReturn(List.of());
+            // List.of() → NationalLibraryApiResponse(0, List.of())로 변경
+            given(apiClient.searchBooks("스프링", 1, 10))
+                    .willReturn(new NationalLibraryApiResponse(0, List.of()));
 
             PageResponse<NationalLibraryBookResponse> result =
                     nationalLibraryService.searchBooks(request);

@@ -1,15 +1,21 @@
 package com.example.hot6novelcraft.domain.novel.service;
 
+import com.example.hot6novelcraft.common.dto.PageResponse;
 import com.example.hot6novelcraft.common.exception.ServiceErrorException;
 import com.example.hot6novelcraft.common.exception.domain.NovelExceptionEnum;
+import com.example.hot6novelcraft.common.exception.domain.UserExceptionEnum;
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelCreateRequest;
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelUpdateRequest;
 import com.example.hot6novelcraft.domain.novel.dto.response.NovelCreateResponse;
 import com.example.hot6novelcraft.domain.novel.dto.response.NovelDeleteResponse;
+import com.example.hot6novelcraft.domain.novel.dto.response.NovelListResponse;
 import com.example.hot6novelcraft.domain.novel.dto.response.NovelUpdateResponse;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
+import com.example.hot6novelcraft.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +30,7 @@ import java.util.Objects;
 public class NovelService {
 
     private final NovelRepository novelRepository;
+    private final UserRepository userRepository;
 
     // 소설 등록
     @Transactional
@@ -94,6 +101,34 @@ public class NovelService {
         novel.delete();
 
         return NovelDeleteResponse.from(novel.getId());
+    }
+
+    // 소설 목록 조회 V1(JPA)
+    @Transactional(readOnly = true)
+    public PageResponse<NovelListResponse> getNovelListV1(Pageable pageable) {
+
+        Page<Novel> novels = novelRepository.findAllByIsDeletedFalse(pageable);
+
+        Page<NovelListResponse> response = novels.map(novel -> {
+            // N+1 문제 발생 가능 - V2에서 QueryDSL로 개선 예정
+            String authorNickname = userRepository.findById(novel.getAuthorId())
+                    .map(user -> user.getNickname())
+                    .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
+
+            return NovelListResponse.of(
+                    novel.getId(),
+                    novel.getTitle(),
+                    novel.getGenre(),
+                    novel.getTags(),
+                    novel.getStatus(),
+                    novel.getCoverImageUrl(),
+                    novel.getViewCount(),
+                    novel.getBookmarkCount(),
+                    authorNickname
+            );
+        });
+
+        return PageResponse.register(response);
     }
 
     // 소설 조회 공통 메서드(본인 소설 및 삭제여부)

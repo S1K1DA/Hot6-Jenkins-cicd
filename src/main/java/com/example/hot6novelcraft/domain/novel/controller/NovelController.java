@@ -1,15 +1,20 @@
 package com.example.hot6novelcraft.domain.novel.controller;
 
 import com.example.hot6novelcraft.common.dto.BaseResponse;
+import com.example.hot6novelcraft.common.dto.PageResponse;
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelCreateRequest;
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelUpdateRequest;
 import com.example.hot6novelcraft.domain.novel.dto.response.NovelCreateResponse;
 import com.example.hot6novelcraft.domain.novel.dto.response.NovelDeleteResponse;
+import com.example.hot6novelcraft.domain.novel.dto.response.NovelListResponse;
 import com.example.hot6novelcraft.domain.novel.dto.response.NovelUpdateResponse;
 import com.example.hot6novelcraft.domain.novel.service.NovelService;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -69,6 +74,21 @@ public class NovelController {
 
         return ResponseEntity.ok(
                 BaseResponse.success("200", "소설 삭제 성공", response)
+        );
+    }
+
+    /**
+     * 소설 목록 조회 V1
+     * 정은식
+     */
+    @GetMapping
+    public ResponseEntity<BaseResponse<PageResponse<NovelListResponse>>> getNovelListV1(
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        PageResponse<NovelListResponse> response = novelService.getNovelListV1(pageable);
+
+        return ResponseEntity.ok(
+                BaseResponse.success("200", "소설 목록 조회 성공(V1)", response)
         );
     }
 }

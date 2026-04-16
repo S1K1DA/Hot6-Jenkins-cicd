@@ -102,8 +102,13 @@ public class NovelWikiService {
 
         // Redis 캐시 확인
         String cacheKey = WIKI_CACHE_KEY + novelId;
-        Object cached = redisTemplate.opsForValue().get(cacheKey);
 
+        Object cached = null;
+        try {
+            cached = redisTemplate.opsForValue().get(cacheKey);
+        } catch (RuntimeException e) {
+            log.warn("Wiki cache read failed. key={}", cacheKey, e);
+        }
 
         if (cached != null) {
             return (List<NovelWikiResponse>) cached;
@@ -118,7 +123,11 @@ public class NovelWikiService {
                 .collect(Collectors.toList());
 
         // Redis 캐싱
-        redisTemplate.opsForValue().set(cacheKey, response, WIKI_CACHE_TTL);
+        try {
+            redisTemplate.opsForValue().set(cacheKey, response, WIKI_CACHE_TTL);
+        } catch (RuntimeException e) {
+            log.warn("Wiki cache write failed. key={}", cacheKey, e);
+        }
 
         return response;
     }

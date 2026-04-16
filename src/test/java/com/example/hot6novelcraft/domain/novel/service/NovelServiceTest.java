@@ -1,17 +1,17 @@
 package com.example.hot6novelcraft.domain.novel.service;
 
+import com.example.hot6novelcraft.common.dto.PageResponse;
 import com.example.hot6novelcraft.common.exception.ServiceErrorException;
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelCreateRequest;
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelUpdateRequest;
-import com.example.hot6novelcraft.domain.novel.dto.response.NovelCreateResponse;
-import com.example.hot6novelcraft.domain.novel.dto.response.NovelDeleteResponse;
-import com.example.hot6novelcraft.domain.novel.dto.response.NovelUpdateResponse;
+import com.example.hot6novelcraft.domain.novel.dto.response.*;
 import com.example.hot6novelcraft.domain.novel.entity.enums.MainGenre;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
 import com.example.hot6novelcraft.domain.user.entity.User;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import com.example.hot6novelcraft.domain.user.entity.userEnum.UserRole;
+import com.example.hot6novelcraft.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -19,7 +19,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,6 +40,9 @@ class NovelServiceTest {
 
     @InjectMocks
     NovelService novelService;
+
+    @Mock
+    UserRepository userRepository;
 
     // 작가 Mock
     private UserDetailsImpl 작가() {
@@ -212,5 +219,59 @@ class NovelServiceTest {
 
         assertThrows(ServiceErrorException.class,
                 () -> novelService.deleteNovel(1L, userDetails));
+    }
+
+    // ==================== 소설 목록 조회 V1 ====================
+
+    @Test
+    void 소설목록조회V1_성공() {
+        Novel novel = 소설(1L);
+        User user = mock(User.class);
+        given(user.getNickname()).willReturn("테스트작가");
+
+        Page<Novel> novelPage = new PageImpl<>(List.of(novel));
+        given(novelRepository.findAllByIsDeletedFalse(any())).willReturn(novelPage);
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+        PageResponse<NovelListResponse> response = novelService.getNovelListV1(Pageable.ofSize(10));
+
+        assertNotNull(response);
+        assertEquals(1, response.content().size());
+    }
+
+// ==================== 소설 상세 조회 V1 ====================
+
+    @Test
+    void 소설상세조회V1_성공() {
+        Novel novel = 소설(1L);
+        User user = mock(User.class);
+        given(user.getNickname()).willReturn("테스트작가");
+
+        given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+        NovelDetailResponse response = novelService.getNovelDetailV1(1L);
+
+        assertNotNull(response);
+    }
+
+    @Test
+    void 소설상세조회V1_소설없으면_실패() {
+        given(novelRepository.findById(1L)).willReturn(Optional.empty());
+
+        assertThrows(ServiceErrorException.class,
+                () -> novelService.getNovelDetailV1(1L));
+    }
+
+    @Test
+    void 소설상세조회V1_삭제된소설이면_실패() {
+        Novel novel = mock(Novel.class);
+        given(novel.getAuthorId()).willReturn(1L);
+        given(novel.isDeleted()).willReturn(true);
+
+        given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
+
+        assertThrows(ServiceErrorException.class,
+                () -> novelService.getNovelDetailV1(1L));
     }
 }

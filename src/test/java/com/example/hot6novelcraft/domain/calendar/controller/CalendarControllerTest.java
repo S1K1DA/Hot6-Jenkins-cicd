@@ -3,6 +3,9 @@ package com.example.hot6novelcraft.domain.calendar.controller;
 import com.example.hot6novelcraft.common.dto.PageResponse;
 import com.example.hot6novelcraft.common.exception.GlobalExceptionHandler;
 import com.example.hot6novelcraft.common.exception.ServiceErrorException;
+import com.example.hot6novelcraft.domain.user.entity.User;
+import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
+import com.example.hot6novelcraft.domain.user.service.SignupService;
 import com.example.hot6novelcraft.domain.calendar.dto.request.ReadingRecordCreateRequest;
 import com.example.hot6novelcraft.domain.calendar.dto.response.CalendarDailyResponse;
 import com.example.hot6novelcraft.domain.calendar.dto.response.MonthlyStatResponse;
@@ -12,8 +15,7 @@ import com.example.hot6novelcraft.domain.calendar.entity.enums.ReadingStatus;
 import com.example.hot6novelcraft.domain.calendar.entity.enums.RecordSource;
 import com.example.hot6novelcraft.common.exception.domain.CalendarExceptionEnum;
 import com.example.hot6novelcraft.domain.calendar.service.CalendarService;
-import com.example.hot6novelcraft.domain.user.entity.User;
-import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
+import com.example.hot6novelcraft.domain.user.service.UserCacheService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +56,7 @@ class CalendarControllerTest {
     private org.springframework.security.core.userdetails.UserDetailsService userDetailsService;
 
     @MockBean
-    private com.example.hot6novelcraft.domain.user.service.UserCacheService userCacheService;
+    private UserCacheService userCacheService;
 
     @MockBean
     private UserDetailsImpl userDetails;

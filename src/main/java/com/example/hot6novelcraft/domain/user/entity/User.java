@@ -7,6 +7,7 @@ import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Getter
 @Entity
@@ -26,7 +27,7 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 100)
     private String password;
 
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(nullable = false, length = 50)
     private String nickname;
 
     @Column(nullable = true, length = 20)
@@ -92,6 +93,7 @@ public class User extends BaseEntity {
                 .build();
     }
 
+    // 소셜 회원가입 추가 정보 업데이트
     public void updateForSocialSignup(String nickname, String phoneNo, LocalDate birthday) {
         this.nickname = nickname;
         this.phoneNo = phoneNo;
@@ -102,8 +104,12 @@ public class User extends BaseEntity {
 
     // 회원정보 수정
     public void update(String nickname, String phoneNo) {
-        this.nickname = nickname;
-        this.phoneNo = phoneNo;
+        if(nickname != null) {
+            this.nickname = nickname;
+        }
+        if(phoneNo != null) {
+            this.phoneNo = phoneNo;
+        }
     }
 
     // 비밀번호 수정
@@ -115,9 +121,26 @@ public class User extends BaseEntity {
     public void withdraw() {
         this.isDeleted = true;
         this.deletedAt = LocalDateTime.now();
+        this.refreshToken = null;
     }
 
-    // TODO 재가입 시 계정 재활성화
+    // 회원 탈퇴 30일 경과 후 비식별화 : 스케쥴러가 호출, unique 제약조건 풀고 개인정보 파기
+    public void anonymize() {
+        String uuid = UUID.randomUUID().toString().substring(0, 8);
+
+        this.email = "deleted_" + uuid + "@anonymous.com";
+        this.nickname = "알수없음_" +uuid;
+
+        this.password = "DELETED";
+        this.phoneNo = null;
+        this.birthday = null;
+    }
+
+    // 30일 이내 계정 복구
+    public void restore() {
+        this.isDeleted = false;
+        this.deletedAt = null;
+    }
 
     public void updateRefreshToken(String refreshToken) {
         this.refreshToken = refreshToken;

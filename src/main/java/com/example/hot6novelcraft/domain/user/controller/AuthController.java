@@ -26,7 +26,6 @@ public class AuthController {
         LoginUserResponse response = authService.login(request);
         return ResponseEntity.ok(BaseResponse.success("200","로그인 성공", response));
     }
-    // TODO role 변경 추가!!!!
 
     @GetMapping("/users/me")
     public ResponseEntity<BaseResponse<MyPageResponse>> getMyPage(
@@ -36,11 +35,11 @@ public class AuthController {
         return ResponseEntity.ok(BaseResponse.success("200","내 정보 조회 성공", response));
     }
 
-    /* ======== 회원 정보 수정 ========
+    /** ======== 회원 정보 수정 ========
     1. 공통 수정 - 닉네임, 전화번호
     2. 작가 프로필 - 장르, 소개글 등
     3. 독자 프로필 - 전호 장르, 독서 목표
-    4. TODO 비번 변경
+    4. 비번 변경
     ============================= */
 
     @PatchMapping("/users/me")
@@ -79,6 +78,10 @@ public class AuthController {
         return ResponseEntity.ok(BaseResponse.success("200", "비밀번호가 변경되었습니다",null));
     }
 
+    /** ======== 회원 정보 수정 ========
+     1. 로그아웃
+     2. 회원탈퇴
+     ============================= */
     @PostMapping("/logout")
     public ResponseEntity<BaseResponse<Void>> logout(
             @RequestHeader("Authorization") String accessToken,
@@ -87,4 +90,23 @@ public class AuthController {
         authService.logout(accessToken, userDetails.getUser().getEmail());
         return ResponseEntity.ok(BaseResponse.success("200", "로그아웃 성공",null));
     }
+
+    @DeleteMapping("/users/delete")
+    public ResponseEntity<BaseResponse<String>> deleteUser(
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        String email = userDetails.getUser().getEmail();
+        authService.withdrawUser(email);
+
+        return ResponseEntity.ok(BaseResponse.success("200", "회원탈퇴가 정상적으로 접수되었습니다. 30일 이내 재접속 시, 계정 복구가 가능합니다", null));
+    }
+
+    @PatchMapping("/users/restore")
+    public ResponseEntity<BaseResponse<String>> restoreUser(
+            @RequestBody UserRestoreRequest request
+    ) {
+        authService.restoreUser(request.email());
+        return ResponseEntity.ok(BaseResponse.success("200", "계정이 성공적으로 복구되었습니다.", null));
+    }
+
 }

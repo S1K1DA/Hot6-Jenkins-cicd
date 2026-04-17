@@ -23,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,23 +46,38 @@ public class AuthService {
     private final AuthorProfileRepository authorProfileRepository;
     private final ReaderProfileRepository readerProfileRepository;
 
-    /* ======== 로그인 및 로그아웃 ========
+    /** ======== 로그인 및 로그아웃 ========
     1. 로그인
     2. 내 정보 조회
     3. 회원정보 수정 - 공통, 작가, 독자별
-    4. 비밀번호 변경 - TODO 번호 인증 진행
-    5. TODO 회원 탈퇴
+    4. 비밀번호 변경
+    5. 회원 탈퇴
     6. 로그아웃
     =================================== */
 
     public LoginUserResponse login(LoginUserRequest request) {
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.email(), request.password())
-        );
+        Authentication authentication;
+
+        try {
+            authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.email(), request.password()));
+
+        } catch (AuthenticationException e) {
+            throw new ServiceErrorException(UserExceptionEnum.ERR_INVALID_EMAIL_OR_PASSWORD);
+        }
 
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         User user = userDetails.getUser();
+
+        if(user.isDeleted()) {
+            throw new ServiceErrorException(UserExceptionEnum.ERR_USER_WITHDRAWAL_PENDING_CONFLICT);
+        }
+
+        // 비밀번호 검증
+        if(!passwordEncoder.matches(request.password(), user.getPassword())) {
+            throw new ServiceErrorException(UserExceptionEnum.ERR_INVALID_EMAIL_OR_PASSWORD);
+        }
 
         String accessToken = jwtUtil.createAccessToken(user.getEmail(), user.getRole());
         String refreshToken = jwtUtil.createRefreshToken(user.getEmail());
@@ -70,8 +86,9 @@ public class AuthService {
         userCacheService.saveRefreshToken(user.getEmail(), refreshToken, refreshExpiration);
 
         String pureNewRefresh = jwtUtil.substringToken(refreshToken);
-
         user.updateRefreshToken(pureNewRefresh);
+
+        userRepository.save(user);
 
         return LoginUserResponse.of(user, accessToken, refreshToken);
     }
@@ -99,18 +116,35 @@ public class AuthService {
     public CommonUpdateResponse updateUserInfo(CommonUpdateRequest request, UserDetailsImpl userDetails) {
 
         User user = userRepository.findByIdAndIsDeletedFalse(userDetails.getUser().getId())
-                .orElseThrow(()-> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
+                .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
 
-        if(userRepository.existsByNicknameAndIdNot(request.nickname(), user.getId())) {
-            throw new ServiceErrorException(UserExceptionEnum.ERR_NICKNAME_ALREADY_EXISTS);
+        if (request.nickname() != null && !user.getNickname().equals(request.nickname())) {
+            if (userRepository.existsByNicknameAndIdNot(request.nickname(), user.getId())) {
+                throw new ServiceErrorException(UserExceptionEnum.ERR_NICKNAME_ALREADY_EXISTS);
+            }
         }
 
-        // TODO 폰 검증 로직 추가 + SMS 인증 서비스 연동
+        // 휴대폰 번호 수정
+        if(request.phoneNo() != null && !user.getPhoneNo().equals(request.phoneNo())) {
 
-        user.update(request.nickname(), request.phoneNo());
+            String cleanPhoneNo = request.phoneNo().replaceAll("-", "");
+            String verifiedKey = "SMS:VERIFIED:" + cleanPhoneNo;
 
-        return CommonUpdateResponse.of(user);
+            Object isVerified = redisUtil.get(verifiedKey);
+
+            if(isVerified == null || !"TRUE".equals(isVerified.toString())) {
+
+                log.info("[SMS] 인증되지 않은 번호로 접근 시도됨, {} ", cleanPhoneNo);
+                throw new ServiceErrorException(UserExceptionEnum.ERR_PHONE_NOT_VERIFIED);
+            }
+                redisUtil.delete(verifiedKey);
+                log.info("[SMS] Redis 인증 확인 및 삭제 완료, phoneNo: {} ", cleanPhoneNo);
+                log.info("[Update] 핸드폰 번호 변경 승인 - user: {}, newPhone: {}", user.getEmail(), cleanPhoneNo);
+            }
+            user.update(request.nickname(), request.phoneNo());
+            return CommonUpdateResponse.of(user);
     }
+
 
     public AuthorUpdateResponse authorUpdateProfile(AuthorRequest request, UserDetailsImpl userDetails) {
 
@@ -180,9 +214,6 @@ public class AuthService {
         log.info("[비밀번호 변경] email: {}", user.getEmail());
     }
 
-    // TODO 회원 탈퇴
-
-
     public void logout(String accessToken, String email) {
         String token = jwtUtil.substringToken(accessToken);
         userCacheService.deleteRefreshToken(email);
@@ -198,5 +229,32 @@ public class AuthService {
         } catch(Exception e) {
             log.warn("이미 만료된 토큰입니다.");
         }
+    }
+
+    /** ======== 회원 탈퇴 ========
+     1. 탈퇴 유예 - 탈퇴 직후부터 30일 유예 상태로 변경
+     2. 회원 복구 - 탈퇴 직후부터 30일 이내 재로그인 (사용자 마음 변함)
+     =================================== */
+    public void withdrawUser(String email) {
+        User user =  userRepository.findByEmail(email)
+                .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
+
+        // 탈퇴한 유저인지 검증
+        if(user.isDeleted()) {
+            throw new ServiceErrorException(UserExceptionEnum.ERR_USER_WITHDRAWAL_PENDING_FORBIDDEN);
+        }
+
+        // 탈퇴 상태로 변경
+        user.withdraw();
+    }
+
+    public void restoreUser(String email) {
+        User user =  userRepository.findByEmail(email)
+                .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
+
+        if(!user.isDeleted()) {
+            throw new ServiceErrorException(UserExceptionEnum.ERR_USER_WITHDRAWAL_PENDING_CONFLICT);
+        }
+        user.restore();
     }
 }

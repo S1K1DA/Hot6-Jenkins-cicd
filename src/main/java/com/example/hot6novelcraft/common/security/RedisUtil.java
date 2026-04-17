@@ -17,13 +17,34 @@ public class RedisUtil {
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedissonClient redissonClient;
 
-    // 블랙리스트 등록 (key - Token, value - 상태, duration - 유효시간)
+    /** 블랙리스트 등록
+     * key - Token
+     * value - 상태
+     * duration - 유효시간
+     **/
     public void setBlackList(String accessToken, Object object, Duration duration) {
         redisTemplate.opsForValue().set(accessToken, object, duration);
     }
 
     public boolean isBlackList(String accessToken) {
         return Boolean.TRUE.equals(redisTemplate.hasKey(accessToken));
+    }
+
+    /** SMS 인증번호 저장 및 재사용 방지 및 삭제
+    * 1. 데이터 조회
+    * 2. 데이터 삭제 (인증 성공 후 바로 삭제)
+    * 3. 데이터 저장 (TTL 사용)
+    **/
+    public Object get(String key) {
+        return redisTemplate.opsForValue().get(key);
+    }
+
+    public boolean delete(String key) {
+        return Boolean.TRUE.equals(redisTemplate.delete(key));
+    }
+
+    public void set(String key, Object value, long duration) {
+        redisTemplate.opsForValue().set(key, value, Duration.ofMinutes(5));
     }
 
     /**

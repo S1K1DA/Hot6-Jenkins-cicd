@@ -6,7 +6,7 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 public enum UserExceptionEnum implements ErrorCode {
-    ERR_NOT_FOUND_USER(HttpStatus.NOT_FOUND, "유저를 찾을 수 없습니다")
+    ERR_NOT_FOUND_USER(HttpStatus.NOT_FOUND, "존재하지 않거나 탈퇴한 사용자입니다")
     , ERR_INVALID_ROLE(HttpStatus.BAD_REQUEST, "역할을 찾을 수 없습니다")
     , ERR_NOT_FOUND_EMAIL(HttpStatus.NOT_FOUND, "이메일을 찾을 수 없습니다")
 
@@ -21,13 +21,18 @@ public enum UserExceptionEnum implements ErrorCode {
     // 휴대폰 인증
     , ERR_INVALID_PHONE_NO(HttpStatus.BAD_REQUEST, "휴대폰 번호형식이 올바르지 않습니다")
     , ERR_PHONE_NO_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 등록된 휴대폰 번호입니다")
-    , ERR_MANY_TO_PHONE_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 시도해주세요")
+    , ERR_FAILED_SEND_SMS(HttpStatus.INTERNAL_SERVER_ERROR, "SMS 전송이 실패했습니다")
     , ERR_INVALID_PHONE(HttpStatus.BAD_REQUEST, "인증번호가 만료되었습니다")
     , ERR_INVALID_PHONE_VERIFICATION(HttpStatus.UNAUTHORIZED,"휴대폰 인증이 유효하지 않습니다")
+    , ERR_PHONE_NOT_VERIFIED(HttpStatus.CONFLICT, "휴대폰 인증을 다시해주세요")
 
     // 로그인
     , ERR_FAILED_SOCIAL(HttpStatus.NOT_FOUND, "소셜 인증에 실패했습니다")
     , ERR_INVALID_EMAIL_OR_PASSWORD(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다")
+
+    // 회원탈퇴
+    , ERR_USER_WITHDRAWAL_PENDING_CONFLICT(HttpStatus.CONFLICT, "탈퇴 진행 중인 계정입니다. 복구 후 이용해주세요")
+    , ERR_USER_WITHDRAWAL_PENDING_FORBIDDEN(HttpStatus.FORBIDDEN, "탈퇴 진행 중인 계정입니다. 복구 하시겠습니까?")
 
     // 회원정보
     , ERR_NOT_FOUND_AUTHOR_PROFILE(HttpStatus.NOT_FOUND,"작가 프로필을 찾을 수 없습니다")

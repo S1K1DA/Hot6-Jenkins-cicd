@@ -1,12 +1,14 @@
 package com.example.hot6novelcraft.domain.user.controller;
 
 import com.example.hot6novelcraft.common.dto.BaseResponse;
+import com.example.hot6novelcraft.common.security.RedisUtil;
 import com.example.hot6novelcraft.domain.user.dto.request.*;
 import com.example.hot6novelcraft.domain.user.dto.response.*;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import com.example.hot6novelcraft.domain.user.entity.enums.ProviderSns;
 import com.example.hot6novelcraft.domain.user.service.AuthService;
 import com.example.hot6novelcraft.domain.user.service.SignupService;
+import com.example.hot6novelcraft.domain.user.service.SmsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,8 +22,12 @@ import org.springframework.web.bind.annotation.*;
 public class SignupController {
 
     private final SignupService signupService;
+    private final SmsService smsService;
 
-    // ======== 중복 확인 ========
+    /** ======== 중복 확인 ========
+     1. 이메일
+     2. 닉네임
+     ============================*/
     @GetMapping("/email/check")
     public ResponseEntity<BaseResponse<Void>> checkEmail(
             @RequestParam String email
@@ -40,13 +46,15 @@ public class SignupController {
         return ResponseEntity.ok(BaseResponse.success("200", "사용할 수 있는 닉네임입니다", null));
     }
 
-    // ======== 휴대폰 인증 ========
-    // TODO : 외부 API 연결
-
+    /** ======== SMS 인증 ========
+     1. 인증번호 발송
+     2. 인증번호 검증
+     ============================*/
     @PostMapping("/phone/send")
     public ResponseEntity<BaseResponse<Void>> sendVerificationCode(
             @Valid @RequestBody PhoneSendRequest request
     ) {
+        smsService.sendSMS(request.phoneNo());
         return ResponseEntity.ok(BaseResponse.success("200","인증번호를 발송했습니다", null));
     }
 
@@ -54,17 +62,17 @@ public class SignupController {
     public ResponseEntity<BaseResponse<Void>> phoneVerifyRequest(
             @Valid @RequestBody PhoneVerifyRequest request
     ) {
+        smsService.verifyAuthCode(request.phoneNo(), request.verificationCode());
         return ResponseEntity.ok(BaseResponse.success("200","인증번호가 성공적으로 확인되었습니다", null));
     }
 
-    /* ======== 회원 가입 ========
-    1. 공통 회원가입 - 일반 이메일 가입
-    2. 독자 회원가입 - 독자 추가 정보 기입
-    3. 작가 회원가입 - 작가 추가 정보 기입
-    4. 소셜 회원가입
-    5. 관리자 회원가입 - 이메일, 비밀번호, 핸드폰 인증만 진행
-    ============================= */
-
+     /** ======== 회원 가입 ========
+     1. 공통 회원가입 - 일반 이메일 가입
+     2. 독자 회원가입 - 독자 추가 정보 기입
+     3. 작가 회원가입 - 작가 추가 정보 기입
+     4. 소셜 회원가입
+     5. 관리자 회원가입 - 이메일, 비밀번호, 핸드폰 인증만 진행
+     ============================= */
     @PostMapping("/signup")
     public ResponseEntity<BaseResponse<CommonSignupResponse>> signup(
             @Valid @RequestBody CommonSignupRequest request

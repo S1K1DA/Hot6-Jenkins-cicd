@@ -507,10 +507,8 @@ async function openRoom(room) {
   totalPages    = 1;
 
   // 사이드바 활성화 표시
-  document.querySelectorAll('.room-item').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.room-item').forEach(el => {
-    if (el.querySelector('.room-sub')?.textContent.includes(`#${room.id}`))
-      el.classList.add('active');
+    el.classList.toggle('active', el.dataset.roomId === String(room.id));
   });
 
   // 채팅 패널 표시

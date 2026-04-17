@@ -69,7 +69,7 @@ public class ChatService {
                 })
                 .orElseGet(() -> {
                     try {
-                        ChatRoom room = chatRoomRepository.save(
+                        ChatRoom room = chatRoomRepository.saveAndFlush(
                                 ChatRoom.create(mentorshipId, mentorUserId, menteeUserId)
                         );
                         return ChatRoomResponse.from(room);
@@ -123,7 +123,7 @@ public class ChatService {
     @Transactional
     public ChatMessageResponse saveMessage(Long roomId, Long senderId, ChatMessageRequest request) {
         ChatRoom room = getChatRoomOrThrow(roomId);
-        validateParticipant(room, senderId);
+        validateActiveParticipant(room, senderId);
         ChatMessage message = chatMessageRepository.save(
                 ChatMessage.create(roomId, senderId, request.content(), request.messageType())
         );
@@ -149,7 +149,7 @@ public class ChatService {
     @Transactional
     public void markMessagesAsRead(Long roomId, Long userId) {
         ChatRoom room = getChatRoomOrThrow(roomId);
-        validateParticipant(room, userId);
+        validateActiveParticipant(room, userId);
         chatMessageRepository.markAllAsRead(roomId, userId);
     }
 
@@ -160,6 +160,13 @@ public class ChatService {
 
     private void validateParticipant(ChatRoom room, Long userId) {
         if (!room.isParticipant(userId)) {
+            throw new ServiceErrorException(ChatExceptionEnum.ERR_NOT_PARTICIPANT);
+        }
+    }
+
+    private void validateActiveParticipant(ChatRoom room, Long userId) {
+        validateParticipant(room, userId);
+        if (room.hasLeft(userId)) {
             throw new ServiceErrorException(ChatExceptionEnum.ERR_NOT_PARTICIPANT);
         }
     }

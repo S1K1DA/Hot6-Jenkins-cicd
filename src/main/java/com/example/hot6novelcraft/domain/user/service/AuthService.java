@@ -234,6 +234,7 @@ public class AuthService {
     /** ======== 회원 탈퇴 ========
      1. 탈퇴 유예 - 탈퇴 직후부터 30일 유예 상태로 변경
      2. 회원 복구 - 탈퇴 직후부터 30일 이내 재로그인 (사용자 마음 변함)
+     3. 즉시 파기 - 30일 이전 유저 요청에 의한 즉시 데이터 파기 (새로운 이력 생성)
      =================================== */
     public void withdrawUser(String email) {
         User user =  userRepository.findByEmail(email)
@@ -256,5 +257,21 @@ public class AuthService {
             throw new ServiceErrorException(UserExceptionEnum.ERR_USER_WITHDRAWAL_PENDING_CONFLICT);
         }
         user.restore();
+    }
+
+    @Transactional
+    public void abandonRecovery(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
+
+        // 이 유저가 진짜 탈퇴 유예 상태인지 한 번 더 확인
+        if (!user.isDeleted()) {
+            throw new ServiceErrorException(UserExceptionEnum.ERR_NOT_WITHDRAWAL_PENDING);
+        }
+
+        // 30일을 기다리지 않고 지금 즉시 이메일과 닉네임을 UUID로 날림
+        user.anonymize();
+
+        log.info("유저 복구 포기: 즉시 비식별화 처리 완료. (기존 이메일: {})", email);
     }
 }

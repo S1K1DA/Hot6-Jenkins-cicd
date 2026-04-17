@@ -81,6 +81,8 @@ public class AuthController {
     /** ======== 회원 정보 수정 ========
      1. 로그아웃
      2. 회원탈퇴
+     3. 회원복구 (30일 이내)
+     4. 즉시삭제 (새로운 이력생성 위해)
      ============================= */
     @PostMapping("/logout")
     public ResponseEntity<BaseResponse<Void>> logout(
@@ -109,4 +111,13 @@ public class AuthController {
         return ResponseEntity.ok(BaseResponse.success("200", "계정이 성공적으로 복구되었습니다.", null));
     }
 
+    @PostMapping("/users/abandon-recovery")
+    public ResponseEntity<BaseResponse<Void>> abandonRecovery(
+            // (기존에 쓰던 email만 받는 DTO 재사용)
+            @RequestBody UserRestoreRequest request
+    ) {
+        authService.abandonRecovery(request.email());
+
+        return ResponseEntity.ok(BaseResponse.success("200", "기존 계정 복구를 포기하고 데이터를 파기했습니다. 신규 가입이 가능합니다.", null));
+    }
 }

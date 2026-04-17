@@ -33,6 +33,7 @@ public enum UserExceptionEnum implements ErrorCode {
     // 회원탈퇴
     , ERR_USER_WITHDRAWAL_PENDING_CONFLICT(HttpStatus.CONFLICT, "탈퇴 진행 중인 계정입니다. 복구 후 이용해주세요")
     , ERR_USER_WITHDRAWAL_PENDING_FORBIDDEN(HttpStatus.FORBIDDEN, "탈퇴 진행 중인 계정입니다. 복구 하시겠습니까?")
+    , ERR_NOT_WITHDRAWAL_PENDING(HttpStatus.NOT_FOUND, "탈퇴 유예 상태인 유저만 가능한 요청입니다")
 
     // 회원정보
     , ERR_NOT_FOUND_AUTHOR_PROFILE(HttpStatus.NOT_FOUND,"작가 프로필을 찾을 수 없습니다")

@@ -12,7 +12,8 @@ import java.time.LocalDateTime;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "episodes")
+@Table(name = "episodes",
+        indexes = @Index(name = "idx_episode_novel_id", columnList = "novel_id"))
 public class Episode extends BaseEntity {
 
     @Id

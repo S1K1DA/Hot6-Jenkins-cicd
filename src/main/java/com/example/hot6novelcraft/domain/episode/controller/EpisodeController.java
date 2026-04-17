@@ -1,16 +1,17 @@
 package com.example.hot6novelcraft.domain.episode.controller;
 
 import com.example.hot6novelcraft.common.dto.BaseResponse;
+import com.example.hot6novelcraft.common.dto.PageResponse;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeCreateRequest;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeUpdateRequest;
-import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeCreateResponse;
-import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeDeleteResponse;
-import com.example.hot6novelcraft.domain.episode.dto.response.EpisodePublishResponse;
-import com.example.hot6novelcraft.domain.episode.dto.response.EpisodeUpdateResponse;
+import com.example.hot6novelcraft.domain.episode.dto.response.*;
 import com.example.hot6novelcraft.domain.episode.service.EpisodeService;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -87,6 +88,54 @@ public class EpisodeController {
 
         return ResponseEntity.ok(
                 BaseResponse.success("200", "회차 발행 성공", response)
+        );
+    }
+
+    /**
+     * 회차 목록 조회
+     * 정은식
+     */
+    @GetMapping("/novels/{novelId}/episodes")
+    public ResponseEntity<BaseResponse<PageResponse<EpisodeListResponse>>> getEpisodeList(
+            @PathVariable Long novelId,
+            @PageableDefault(size = 20, sort = "episodeNumber", direction = Sort.Direction.ASC) Pageable pageable
+    ) {
+        PageResponse<EpisodeListResponse> response = episodeService.getEpisodeList(novelId, pageable);
+
+        return ResponseEntity.ok(
+                BaseResponse.success("200", "회차 목록 조회 성공", response)
+        );
+    }
+
+    /**
+     * 회차 본문 조회 V1 (JPA)
+     * 정은식
+     */
+    @GetMapping("/v1/episodes/{episodeId}")
+    public ResponseEntity<BaseResponse<EpisodeDetailResponse>> getEpisodeContentV1(
+            @PathVariable Long episodeId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        EpisodeDetailResponse response = episodeService.getEpisodeContentV1(episodeId, userDetails);
+
+        return ResponseEntity.ok(
+                BaseResponse.success("200", "회차 본문 조회 성공(V1)", response)
+        );
+    }
+
+    /**
+     * 회차 본문 조회 V2 (Hot Key + 벌크 캐싱)
+     * 정은식
+     */
+    @GetMapping("/v2/episodes/{episodeId}")
+    public ResponseEntity<BaseResponse<EpisodeDetailResponse>> getEpisodeContentV2(
+            @PathVariable Long episodeId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        EpisodeDetailResponse response = episodeService.getEpisodeContentV2(episodeId, userDetails);
+
+        return ResponseEntity.ok(
+                BaseResponse.success("200", "회차 본문 조회 성공(V2)", response)
         );
     }
 }

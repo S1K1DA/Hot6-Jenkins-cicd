@@ -5,7 +5,6 @@ import com.example.hot6novelcraft.domain.episode.entity.enums.EpisodeStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
 import java.util.List;
 import java.util.Map;
 
@@ -36,4 +35,12 @@ public interface EpisodeRepository extends JpaRepository<Episode, Long>, CustomE
                         row -> (Long) row[1]
                 ));
     }
+
+    // 소설 목록 기준 PUBLISHED 에피소드 수 조회
+    @Query("SELECT COUNT(e) FROM Episode e WHERE e.novelId IN :novelIds AND e.status = :status AND e.isDeleted = false")
+    long countByNovelIdInAndStatus(@Param("novelIds") List<Long> novelIds, @Param("status") EpisodeStatus status);
+
+    // 소설 목록 기준 likeCount 합산 조회
+    @Query("SELECT COALESCE(SUM(e.likeCount), 0) FROM Episode e WHERE e.novelId IN :novelIds AND e.isDeleted = false")
+    long sumLikeCountByNovelIdIn(@Param("novelIds") List<Long> novelIds);
 }

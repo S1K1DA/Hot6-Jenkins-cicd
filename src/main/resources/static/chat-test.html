@@ -620,7 +620,7 @@ function connectWs(roomId) {
       document.getElementById('sendBtn').disabled = false;
 
       stompClient.subscribe('/user/queue/errors', frame => {
-        showSystemMessage('오류: ' + frame.body);
+        appendSystemMsg('오류: ' + frame.body);
       });
 
       stompClient.subscribe(`/topic/chat/${roomId}`, frame => {

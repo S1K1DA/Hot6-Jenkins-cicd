@@ -124,6 +124,14 @@ public class ChatService {
      */
     @Transactional
     public ChatMessageResponse saveMessage(Long roomId, Long senderId, ChatMessageRequest request) {
+        // 메시지 타입 및 내용 검증
+        if (request.messageType() == null) {
+            throw new ServiceErrorException(ChatExceptionEnum.ERR_INVALID_MESSAGE);
+        }
+        if (request.content() == null || request.content().isBlank()) {
+            throw new ServiceErrorException(ChatExceptionEnum.ERR_INVALID_MESSAGE);
+        }
+
         ChatRoom room = getChatRoomOrThrow(roomId);
         validateActiveParticipant(room, senderId);
         ChatMessage message = chatMessageRepository.save(

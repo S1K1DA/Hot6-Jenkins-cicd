@@ -53,8 +53,8 @@ public class ChatRedisPublisher {
             }
         }
 
-        // 모든 재시도 실패
-        log.error("[Redis] 이벤트 발행 최종 실패 ({}회 재시도) roomId={}: {}",
-                MAX_RETRY_ATTEMPTS, roomId, lastException.getMessage());
+        // 모든 재시도 실패 (스택트레이스 포함하여 디버깅 용이)
+        log.error("[Redis] 이벤트 발행 최종 실패 ({}회 재시도) roomId={}",
+                MAX_RETRY_ATTEMPTS, roomId, lastException);
     }
 }

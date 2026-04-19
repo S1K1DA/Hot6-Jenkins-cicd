@@ -14,6 +14,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -108,53 +110,66 @@ public class CustomSearchRepositoryImpl implements CustomSearchRepository {
         QAuthorProfile authorProfile = QAuthorProfile.authorProfile;
         QNovel novel = QNovel.novel;
 
-        // 닉네임 키워드로 작가 ID 목록 조회
-        List<Long> authorIds = queryFactory
-                .select(user.id)
+        // 닉네임 키워드로 작가 ID+기본 정보 목록 조회
+        List<Tuple> authorTuples = queryFactory
+                .select(
+                        user.id
+                        , user.nickname
+                        , authorProfile.bio)
                 .from(user)
                 .join(authorProfile).on(user.id.eq(authorProfile.userId))
                 .where(user.nickname.containsIgnoreCase(keyword))
                 .fetch();
 
-        // 작가별 기본전보 + 대표작 3개 표시
-        List<AuthorSearchResponse> matchingAuthors = authorIds.stream()
-                .map(authorId -> {
-                    Tuple authorInfo = queryFactory
-                            .select(user.nickname, authorProfile.bio)
-                            .from(user)
-                            .join(authorProfile).on(user.id.eq(authorProfile.userId))
-                            .where(user.id.eq(authorId))
-                            .fetchOne();
-
-                    if(authorInfo == null) return null;
-
-                    // 대표작 3개 - 조회수 높은 순서로 표시
-                    List<AuthorSearchResponse.NovelSimple> top3Novels = queryFactory
-                            .select(Projections.constructor(
-                                    AuthorSearchResponse.NovelSimple.class
-                                    , novel.id
-                                    , novel.title
-                                    , novel.coverImageUrl
-                            ))
-                            .from(novel)
-                            .where(
-                                    novel.authorId.eq(authorId)
-                                    , novel.isDeleted.eq(false)
-                            )
-                            .orderBy(novel.viewCount.desc())
-                            .limit(3)
-                            .fetch();
-
-                    return new AuthorSearchResponse(
-                            authorId
-                            , authorInfo.get(user.nickname)
-                            , authorInfo.get(authorProfile.bio)
-                            , top3Novels);
-                })
-                .filter(result -> result != null)
+        // 작가 ID 목록 추출
+        List<Long> authorIds = authorTuples.stream()
+                .map(t -> t.get(user.id))
                 .toList();
 
-        // 제목에 키워드가 포함된 소설들 (제목+작가)
+        // 모든 작가 소설 IN 으로 한번에 조회
+        List<Tuple> allNovels = queryFactory
+                .select(
+                        novel.authorId
+                        , novel.id
+                        , novel.title
+                        , novel.coverImageUrl
+                )
+                .from(novel)
+                .where(
+                        novel.authorId.in(authorIds)
+                        , novel.isDeleted.eq(false)
+                )
+                .orderBy(novel.viewCount.desc())
+                .fetch();
+
+        // 작가별 소설 그룹핑
+        Map<Long, List<AuthorSearchResponse.NovelSimple>> novelsByAuthor = allNovels.stream()
+                .collect(Collectors.groupingBy(
+                        t -> t.get(novel.authorId)
+                , Collectors.mapping(
+                        t -> new AuthorSearchResponse.NovelSimple(
+                                t.get(novel.id)
+                                , t.get(novel.title)
+                                , t.get(novel.coverImageUrl)
+                        ),
+                        Collectors.toList()
+                )
+        ));
+
+        // 작가별 대표작 3개 표시
+        List<AuthorSearchResponse> matchingAuthors = authorTuples.stream()
+                .map(t -> new AuthorSearchResponse(
+                        t.get(user.id)
+                        , t.get(user.nickname)
+                        , t.get(authorProfile.bio)
+                        , novelsByAuthor.getOrDefault(t.get(user.id), List.of())
+                        .stream()
+                        .limit(3)
+                        .toList()
+                ))
+                .toList();
+
+        // 제목 키워드 소설 목록
         List<NovelSimpleResponse> matchingNovels = queryFactory
                 .select(Projections.constructor(
                         NovelSimpleResponse.class
@@ -171,5 +186,4 @@ public class CustomSearchRepositoryImpl implements CustomSearchRepository {
 
         return new IntegratedAuthorSearchResponse(matchingAuthors, matchingNovels);
     }
-
 }

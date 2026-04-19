@@ -6,6 +6,7 @@ import com.example.hot6novelcraft.domain.search.dto.TagGroupSearchResponse;
 import com.example.hot6novelcraft.domain.search.repository.CustomSearchRepository;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -18,6 +19,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -75,16 +77,21 @@ public class SearchService {
             Long userId = userDetails.getUser().getId();
             String redisKey = "search_history:" + userId;
 
-            redisTemplate.opsForList().remove(redisKey, 0, keyword); // 기존 중복 검색어 제거
-            redisTemplate.opsForList().leftPush(redisKey, keyword); // 최신 검색어 맨 앞으로
+            try {
+                redisTemplate.opsForList().remove(redisKey, 0, keyword); // 기존 중복 검색어 제거
+                redisTemplate.opsForList().leftPush(redisKey, keyword); // 최신 검색어 맨 앞으로
 
-            // 해당 키의 TTL이 설정되어 있지 않다면, 금일 00시까지 만료 시간 설정
-            Long expire = redisTemplate.getExpire(redisKey);
-            if(expire == null || expire <= 0) {
-                LocalDateTime midnight = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
-                Duration duration = Duration.between(LocalDateTime.now(), midnight);
-                redisTemplate.expire(redisKey, duration);
+                // 해당 키의 TTL이 설정되어 있지 않다면, 금일 00시까지 만료 시간 설정
+                Long expire = redisTemplate.getExpire(redisKey);
+                if(expire == null || expire <= 0) {
+                    LocalDateTime midnight = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
+                    Duration duration = Duration.between(LocalDateTime.now(), midnight);
+                    redisTemplate.expire(redisKey, duration);
+                }
+            } catch (RuntimeException e) {
+                log.warn("[Redis 장애] 검색 저장을 건너뜁니다.");
             }
+
         }
     }
 

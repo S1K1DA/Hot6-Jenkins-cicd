@@ -1,10 +1,9 @@
-package com.example.hot6novelcraft.domain;
+package com.example.hot6novelcraft.domain.search.service;
 
 import com.example.hot6novelcraft.domain.search.dto.IntegratedAuthorSearchResponse;
 import com.example.hot6novelcraft.domain.search.dto.NovelSearchResponse;
 import com.example.hot6novelcraft.domain.search.dto.TagGroupSearchResponse;
 import com.example.hot6novelcraft.domain.search.repository.CustomSearchRepository;
-import com.example.hot6novelcraft.domain.search.service.SearchService;
 import com.example.hot6novelcraft.domain.user.entity.User;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import com.example.hot6novelcraft.domain.search.dto.AuthorSearchResponse;
@@ -26,6 +25,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.ListOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -162,11 +165,16 @@ public class SearchServiceTest {
         }
 
         @Test
-        @DisplayName("V2 소설 검색 - 로그인 시 Redis 저장됨")
+        @DisplayName("V2 소설 검색 - 로그인 시 Redis 저장과 Redis TTL 00시 설정")
         void searchNovelsV2_loggedIn_saveRedis() {
             // given
             Page<NovelSearchResponse> mockPage = new PageImpl<>(List.of(), pageable, 0);
             given(customSearchRepository.searchNovelsByTitle("바다", pageable)).willReturn(mockPage);
+
+            // 테스트 실행 직전 자정까지 남은 시간 계산 (Service 로직과 동일)
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime midnight = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
+            Duration expectedTTL = Duration.between(now, midnight);
 
             // when
             searchService.searchNovels("바다", pageable, loggedInUser);
@@ -175,10 +183,19 @@ public class SearchServiceTest {
             verify(listOperations).remove(eq("search_history:1"), eq(0L), eq("바다"));
             verify(listOperations).leftPush(eq("search_history:1"), eq("바다"));
             verify(redisTemplate).expire(eq("search_history:1"), any());
+
+            // TTL이 "자정까지 남은 시간"인지 검증 (±5초 오차 허용)
+            verify(redisTemplate).expire(
+                    eq("search_history:1"),
+                    argThat(duration -> {
+                        long diff = Math.abs(duration.getSeconds() - expectedTTL.getSeconds());
+                        return diff <= 5; // 테스트 실행 시간 오차 5초 허용
+                    })
+            );
         }
 
         @Test
-        @DisplayName("V2 소설 검색 - 비로그인 시 Redis 저장 안됨")
+        @DisplayName("V2 소설 검색 - TTL이 00시간 이하여야함 / 비로그인 시 Redis 저장 안됨")
         void searchNovelsV2_anonymous_noRedis() {
             // given
             Page<NovelSearchResponse> mockPage = new PageImpl<>(List.of(), pageable, 0);
@@ -187,8 +204,9 @@ public class SearchServiceTest {
             // when
             searchService.searchNovels("바다", pageable, anonymousUser);
 
-            // then - Redis 호출 없어야 함
+            // then - 비로그인은 저장 안됨
             verify(redisTemplate, never()).opsForList();
+            verify(redisTemplate, never()).expire(any(), any());
         }
 
         @Test

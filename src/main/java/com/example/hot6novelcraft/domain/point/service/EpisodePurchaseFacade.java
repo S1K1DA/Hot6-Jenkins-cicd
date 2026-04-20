@@ -27,9 +27,10 @@ public class EpisodePurchaseFacade {
     public EpisodePurchaseResponse purchaseEpisode(Long userId, Long episodeId) {
         log.info("[회차 구매] 요청 userId={} episodeId={}", userId, episodeId);
 
-        String lockKey = "episode:purchase:lock:" + userId + ":" + episodeId;
+        // 사용자 단위 락 (단건/전체 구매 레이스 컨디션 방지)
+        String lockKey = "purchase:lock:" + userId;
         if (!redisUtil.acquireLock(lockKey)) {
-            log.warn("[회차 구매] Lock 획득 실패 (이미 처리 중) userId={} episodeId={}", userId, episodeId);
+            log.warn("[회차 구매] Lock 획득 실패 (이미 처리 중) userId={}", userId);
             throw new ServiceErrorException(PaymentExceptionEnum.ERR_PAYMENT_PROCESSING);
         }
 
@@ -48,9 +49,10 @@ public class EpisodePurchaseFacade {
     public NovelBulkPurchaseResponse purchaseAllEpisodes(Long userId, Long novelId) {
         log.info("[소설 전체 구매] 요청 userId={} novelId={}", userId, novelId);
 
-        String lockKey = "novel:bulk-purchase:lock:" + userId + ":" + novelId;
+        // 사용자 단위 락 (단건/전체 구매 레이스 컨디션 방지)
+        String lockKey = "purchase:lock:" + userId;
         if (!redisUtil.acquireLock(lockKey)) {
-            log.warn("[소설 전체 구매] Lock 획득 실패 (이미 처리 중) userId={} novelId={}", userId, novelId);
+            log.warn("[소설 전체 구매] Lock 획득 실패 (이미 처리 중) userId={}", userId);
             throw new ServiceErrorException(PaymentExceptionEnum.ERR_PAYMENT_PROCESSING);
         }
 

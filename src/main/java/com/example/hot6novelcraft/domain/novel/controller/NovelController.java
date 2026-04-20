@@ -6,6 +6,7 @@ import com.example.hot6novelcraft.domain.novel.dto.request.NovelCreateRequest;
 import com.example.hot6novelcraft.domain.novel.dto.request.NovelUpdateRequest;
 import com.example.hot6novelcraft.domain.novel.dto.response.*;
 import com.example.hot6novelcraft.domain.novel.entity.enums.NovelStatus;
+import com.example.hot6novelcraft.domain.novel.service.NovelRankingService;
 import com.example.hot6novelcraft.domain.novel.service.NovelService;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import jakarta.validation.Valid;
@@ -19,6 +20,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequiredArgsConstructor
 @Validated
@@ -26,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class NovelController {
 
     private final NovelService novelService;
+    private final NovelRankingService novelRankingService;
 
     /**
      * 소설 등록
@@ -135,6 +139,21 @@ public class NovelController {
 
         return ResponseEntity.ok(
                 BaseResponse.success("200", "작가 소설 목록 조회 성공", response)
+        );
+    }
+
+    /**
+     * 인기 소설 TOP 5 (실시간, 주간)
+     * 서하나
+     */
+    @GetMapping("/novels/ranking")
+    public ResponseEntity<BaseResponse<List<NovelRankingResponse>>> getNovelRanking(
+            @RequestParam(defaultValue = "realtime") String type
+    ) {
+        List<NovelRankingResponse> responses = novelRankingService.getNovelRanking(type);
+
+        return ResponseEntity.ok(
+                BaseResponse.success("200", "소설 랭킹 조회 성공", responses)
         );
     }
 }

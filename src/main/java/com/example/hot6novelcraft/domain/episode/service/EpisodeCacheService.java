@@ -26,6 +26,8 @@ public class EpisodeCacheService {
     private static final String NOVEL_VIEW_KEY_PREFIX = "novel_view::";
     private static final String HOT_KEY_PREFIX = "novel_hot::";
     private static final String BULK_KEY_PREFIX = "episode_bulk::";
+    private static final String REALTIME_RANKING_KEY = "ranking:novel:realtime";
+    private static final String WEEKLY_RANKING_KEY = "ranking:novel:weekly";
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
@@ -54,6 +56,16 @@ public class EpisodeCacheService {
         }
 
         return count != null ? count : 0L;
+    }
+
+    /**
+     * 실시간 및 주간 랭킹 ZSet 점수 (조회수에 따른) 증가
+     * 어뷰징 체크 통과 시에만 호출
+     * 서하나 */
+    public void increaseRankingScore(Long novelId) {
+        redisTemplate.opsForZSet().incrementScore(REALTIME_RANKING_KEY, novelId, 1);
+        redisTemplate.opsForZSet().incrementScore(WEEKLY_RANKING_KEY, novelId, 1);
+        log.debug("[랭킹 점수 증가] novelId: {}, 실시간/주간 랭킹 +1", novelId);
     }
 
     // 인기작 여부 판별

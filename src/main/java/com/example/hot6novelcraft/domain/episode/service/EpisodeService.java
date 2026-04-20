@@ -308,6 +308,9 @@ public class EpisodeService {
         if (episodeCacheService.isFirstView(userId, novelId)) {
             novelRepository.incrementViewCount(novelId);
         }
+
+        // Redis 랭킹 Zset 조회수 증가 호출 - 서하나
+        episodeCacheService.increaseRankingScore(novelId);
     }
 
     // 유료 회차 접근 제어 (PointHistory 이력 체크)

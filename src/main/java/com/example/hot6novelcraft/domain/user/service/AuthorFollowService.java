@@ -10,6 +10,7 @@ import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import com.example.hot6novelcraft.domain.user.repository.AuthorFollowRepository;
 import com.example.hot6novelcraft.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,12 +55,16 @@ public class AuthorFollowService {
         }
 
         // 팔로우 생성
-        AuthorFollow follow = AuthorFollow.builder()
-                .followerId(followerId)
-                .followingId(authorId)
-                .build();
-        authorFollowRepository.save(follow);
-
-        return AuthorFollowResponse.of(true);
+        try {
+            AuthorFollow follow = AuthorFollow.builder()
+                    .followerId(followerId)
+                    .followingId(authorId)
+                    .build();
+            authorFollowRepository.save(follow);
+            return AuthorFollowResponse.of(true);
+        } catch (DataIntegrityViolationException e) {
+            // 동시 요청으로 이미 팔로우 저장된 경우 -> 성공으로 처리
+            return AuthorFollowResponse.of(true);
+        }
     }
 }

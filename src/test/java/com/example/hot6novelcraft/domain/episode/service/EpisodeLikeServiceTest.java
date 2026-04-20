@@ -23,6 +23,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 @MockitoSettings(strictness = Strictness.LENIENT)
 @ExtendWith(MockitoExtension.class)
@@ -64,6 +65,7 @@ class EpisodeLikeServiceTest {
         UserDetailsImpl userDetails = 독자();
         Episode episode = 회차(EpisodeStatus.PUBLISHED, 1L);
 
+        // findById가 두 번 호출됨 (처음 + 최신 카운트 조회)
         given(episodeRepository.findById(1L)).willReturn(Optional.of(episode));
         given(episodeLikeRepository.findByUserIdAndEpisodeId(1L, 1L))
                 .willReturn(Optional.empty());
@@ -71,6 +73,7 @@ class EpisodeLikeServiceTest {
         EpisodeLikeResponse response = episodeLikeService.toggleLike(1L, userDetails);
 
         assertTrue(response.isLiked());
+        verify(episodeRepository).incrementLikeCount(1L);
     }
 
     @Test
@@ -86,6 +89,7 @@ class EpisodeLikeServiceTest {
         EpisodeLikeResponse response = episodeLikeService.toggleLike(1L, userDetails);
 
         assertFalse(response.isLiked());
+        verify(episodeRepository).decrementLikeCount(1L);
     }
 
     @Test

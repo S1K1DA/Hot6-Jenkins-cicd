@@ -10,6 +10,7 @@ import com.example.hot6novelcraft.domain.novel.repository.NovelBookmarkRepositor
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,12 +60,16 @@ public class NovelBookmarkService {
         }
 
         // 찜 생성
-        NovelBookmark bookmark = NovelBookmark.builder()
-                .userId(userId)
-                .novelId(novelId)
-                .build();
-        novelBookmarkRepository.save(bookmark);
-
-        return NovelBookmarkResponse.of(true);
+        try {
+            NovelBookmark bookmark = NovelBookmark.builder()
+                    .userId(userId)
+                    .novelId(novelId)
+                    .build();
+            novelBookmarkRepository.save(bookmark);
+            return NovelBookmarkResponse.of(true);
+        } catch (DataIntegrityViolationException e) {
+            // 동시 요청으로 이미 찜 저장된 경우 -> 성공으로 처리
+            return NovelBookmarkResponse.of(true);
+        }
     }
 }

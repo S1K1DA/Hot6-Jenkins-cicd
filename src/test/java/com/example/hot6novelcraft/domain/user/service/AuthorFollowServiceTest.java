@@ -49,6 +49,7 @@ class AuthorFollowServiceTest {
     // 작가 대상 Mock (userId 지정)
     private User 작가(Long userId) {
         User user = mock(User.class);
+        given(user.getId()).willReturn(userId);
         given(user.getRole()).willReturn(UserRole.AUTHOR);
         return user;
     }

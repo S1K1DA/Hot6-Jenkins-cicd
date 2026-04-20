@@ -3,6 +3,7 @@ package com.example.hot6novelcraft.domain.episode.repository;
 import com.example.hot6novelcraft.domain.episode.entity.Episode;
 import com.example.hot6novelcraft.domain.episode.entity.enums.EpisodeStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
@@ -21,6 +22,16 @@ public interface EpisodeRepository extends JpaRepository<Episode, Long>, CustomE
 
     // 이전 회차 중 PUBLISHED 아닌 것 있는지 확인(순서대로 회차 발행 검증을 위해)
     boolean existsByNovelIdAndEpisodeNumberLessThanAndStatusNotAndIsDeletedFalse(Long novelId, int episodeNumber, EpisodeStatus status);
+
+    // 좋아요 +
+    @Modifying
+    @Query("UPDATE Episode e SET e.likeCount = e.likeCount + 1 WHERE e.id = :episodeId")
+    void incrementLikeCount(@Param("episodeId") Long episodeId);
+
+    // 좋아요 -
+    @Modifying
+    @Query("UPDATE Episode e SET e.likeCount = e.likeCount - 1 WHERE e.id = :episodeId AND e.likeCount > 0")
+    void decrementLikeCount(@Param("episodeId") Long episodeId);
 
     @Query("SELECT e.novelId, COUNT(e) FROM Episode e " +
             "WHERE e.novelId IN :novelIds AND e.isDeleted = false " +

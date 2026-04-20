@@ -49,8 +49,12 @@ public class EpisodeLikeService {
         // 이미 좋아요 -> 취소
         if (existing.isPresent()) {
             episodeLikeRepository.delete(existing.get());
-            episode.decreaseLikeCount();
-            return EpisodeLikeResponse.of(false, episode.getLikeCount());
+            episodeRepository.decrementLikeCount(episodeId);
+
+            // 최신 카운트 조회
+            Episode updated = episodeRepository.findById(episodeId)
+                    .orElseThrow(() -> new ServiceErrorException(EpisodeExceptionEnum.EPISODE_NOT_FOUND));
+            return EpisodeLikeResponse.of(false, updated.getLikeCount());
         }
 
         // 좋아요 생성
@@ -59,8 +63,11 @@ public class EpisodeLikeService {
                 .episodeId(episodeId)
                 .build();
         episodeLikeRepository.save(like);
-        episode.increaseLikeCount();
+        episodeRepository.incrementLikeCount(episodeId);
 
-        return EpisodeLikeResponse.of(true, episode.getLikeCount());
+        // 최신 카운트 조회
+        Episode updated = episodeRepository.findById(episodeId)
+                .orElseThrow(() -> new ServiceErrorException(EpisodeExceptionEnum.EPISODE_NOT_FOUND));
+        return EpisodeLikeResponse.of(true, updated.getLikeCount());
     }
 }

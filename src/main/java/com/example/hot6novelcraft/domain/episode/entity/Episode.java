@@ -99,14 +99,4 @@ public class Episode extends BaseEntity {
         this.isDeleted = true;
         deletedAt = LocalDateTime.now();
     }
-
-    // 회차 좋아요 +, -
-    public void increaseLikeCount() {
-        this.likeCount++;
-    }
-    public void decreaseLikeCount() {
-        if (this.likeCount > 0) {
-            this.likeCount--;
-        }
-    }
 }

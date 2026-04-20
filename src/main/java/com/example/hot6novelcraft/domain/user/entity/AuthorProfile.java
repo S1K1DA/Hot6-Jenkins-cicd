@@ -78,11 +78,21 @@ public class AuthorProfile extends BaseEntity {
 
     // 작가 프로필 수정
     public void authorUpdateProfile(String mainGenre, String bio, String instagramLinks, String xLinks, String blogLinks, boolean allowMenteeRequest) {
-        this.mainGenre = mainGenre;
-        this.bio = bio;
-        this.instagramLinks = instagramLinks;
-        this.xLinks = xLinks;
-        this.blogLinks = blogLinks;
+        if(mainGenre != null) {
+            this.mainGenre = mainGenre;
+        }
+        if(bio != null) {
+            this.bio = bio;
+        }
+        if(instagramLinks != null) {
+            this.instagramLinks = instagramLinks;
+        }
+        if (xLinks != null) {
+            this.xLinks = xLinks;
+        }
+        if (blogLinks != null) {
+            this.blogLinks = blogLinks;
+        }
         this.allowMenteeRequest = allowMenteeRequest;
         this.updatedAt = LocalDateTime.now();
     }

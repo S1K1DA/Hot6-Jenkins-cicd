@@ -18,6 +18,7 @@ import com.example.hot6novelcraft.domain.mentoring.repository.MentorshipReposito
 import com.example.hot6novelcraft.domain.mentoring.repository.MentorshipReviewRepository;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
+import com.example.hot6novelcraft.domain.user.entity.User;
 import com.example.hot6novelcraft.domain.user.entity.enums.CareerLevel;
 import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import com.example.hot6novelcraft.domain.user.repository.UserRepository;
@@ -32,12 +33,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
-import com.example.hot6novelcraft.domain.mentor.dto.response.MentorStatisticsResponse;
-import com.example.hot6novelcraft.domain.user.entity.User;
-import com.example.hot6novelcraft.domain.mentor.dto.response.MenteeInfoResponse;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -131,7 +131,6 @@ class MentorServiceTest {
         @Test
         @DisplayName("INTRODUCTION 등급 - 조건 미달 시 PENDING으로 저장")
         void register_introduction_pending() throws Exception {
-            // given
             given(mentorRepository.existsByUserIdAndStatus(USER_ID, MentorStatus.PENDING)).willReturn(false);
             given(mentorRepository.existsByUserIdAndStatus(USER_ID, MentorStatus.APPROVED)).willReturn(false);
             given(novelRepository.findNovelIdsByAuthorId(USER_ID)).willReturn(List.of(1L));
@@ -141,10 +140,8 @@ class MentorServiceTest {
             ArgumentCaptor<Mentor> captor = ArgumentCaptor.forClass(Mentor.class);
             given(mentorRepository.save(captor.capture())).willReturn(mentor);
 
-            // when
             mentorService.register(USER_ID, registerRequest, null);
 
-            // then
             Mentor savedMentor = captor.getValue();
             assertThat(savedMentor.getStatus()).isEqualTo(MentorStatus.PENDING);
             assertThat(savedMentor.getUserId()).isEqualTo(USER_ID);
@@ -153,7 +150,6 @@ class MentorServiceTest {
         @Test
         @DisplayName("INTRODUCTION 등급 - 조건 충족 시 APPROVED로 저장")
         void register_introduction_approved() throws Exception {
-            // given
             given(mentorRepository.existsByUserIdAndStatus(USER_ID, MentorStatus.PENDING)).willReturn(false);
             given(mentorRepository.existsByUserIdAndStatus(USER_ID, MentorStatus.APPROVED)).willReturn(false);
             given(novelRepository.findNovelIdsByAuthorId(USER_ID)).willReturn(List.of(1L));
@@ -163,18 +159,14 @@ class MentorServiceTest {
             ArgumentCaptor<Mentor> captor = ArgumentCaptor.forClass(Mentor.class);
             given(mentorRepository.save(captor.capture())).willReturn(mentor);
 
-            // when
             mentorService.register(USER_ID, registerRequest, null);
 
-            // then
-            Mentor savedMentor = captor.getValue();
-            assertThat(savedMentor.getStatus()).isEqualTo(MentorStatus.APPROVED);
+            assertThat(captor.getValue().getStatus()).isEqualTo(MentorStatus.APPROVED);
         }
 
         @Test
         @DisplayName("ELEMENTARY 등급 - 에피소드 50개 이상 + 좋아요 50개 이상 시 APPROVED")
         void register_elementary_approved() throws Exception {
-            // given
             MentorRegisterRequest elementaryRequest = new MentorRegisterRequest(
                     "판타지 장르를 10년째 쓰고 있습니다",
                     List.of("판타지"),
@@ -193,17 +185,14 @@ class MentorServiceTest {
             ArgumentCaptor<Mentor> captor = ArgumentCaptor.forClass(Mentor.class);
             given(mentorRepository.save(captor.capture())).willReturn(mentor);
 
-            // when
             mentorService.register(USER_ID, elementaryRequest, null);
 
-            // then
             assertThat(captor.getValue().getStatus()).isEqualTo(MentorStatus.APPROVED);
         }
 
         @Test
         @DisplayName("INTERMEDIATE 등급 - 에피소드 100개 이상 + 좋아요 100개 이상 시 APPROVED")
         void register_intermediate_approved() throws Exception {
-            // given
             MentorRegisterRequest intermediateRequest = new MentorRegisterRequest(
                     "판타지 장르를 10년째 쓰고 있습니다",
                     List.of("판타지"),
@@ -222,17 +211,14 @@ class MentorServiceTest {
             ArgumentCaptor<Mentor> captor = ArgumentCaptor.forClass(Mentor.class);
             given(mentorRepository.save(captor.capture())).willReturn(mentor);
 
-            // when
             mentorService.register(USER_ID, intermediateRequest, null);
 
-            // then
             assertThat(captor.getValue().getStatus()).isEqualTo(MentorStatus.APPROVED);
         }
 
         @Test
         @DisplayName("PROFICIENT 등급 - 항상 PENDING, novelRepository 조회 안 함")
         void register_proficient_always_pending() throws Exception {
-            // given
             MentorRegisterRequest proficientRequest = new MentorRegisterRequest(
                     "판타지 장르를 10년째 쓰고 있습니다",
                     List.of("판타지"),
@@ -248,10 +234,8 @@ class MentorServiceTest {
             ArgumentCaptor<Mentor> captor = ArgumentCaptor.forClass(Mentor.class);
             given(mentorRepository.save(captor.capture())).willReturn(mentor);
 
-            // when
             mentorService.register(USER_ID, proficientRequest, null);
 
-            // then
             assertThat(captor.getValue().getStatus()).isEqualTo(MentorStatus.PENDING);
             verify(novelRepository, never()).findNovelIdsByAuthorId(any());
         }
@@ -259,7 +243,6 @@ class MentorServiceTest {
         @Test
         @DisplayName("소설이 없으면 PENDING으로 저장, episodeRepository 조회 안 함")
         void register_no_novels_pending() throws Exception {
-            // given
             given(mentorRepository.existsByUserIdAndStatus(USER_ID, MentorStatus.PENDING)).willReturn(false);
             given(mentorRepository.existsByUserIdAndStatus(USER_ID, MentorStatus.APPROVED)).willReturn(false);
             given(novelRepository.findNovelIdsByAuthorId(USER_ID)).willReturn(List.of());
@@ -268,10 +251,8 @@ class MentorServiceTest {
             ArgumentCaptor<Mentor> captor = ArgumentCaptor.forClass(Mentor.class);
             given(mentorRepository.save(captor.capture())).willReturn(mentor);
 
-            // when
             mentorService.register(USER_ID, registerRequest, null);
 
-            // then
             assertThat(captor.getValue().getStatus()).isEqualTo(MentorStatus.PENDING);
             verify(episodeRepository, never()).countByNovelIdInAndStatus(any(), any());
         }
@@ -279,10 +260,8 @@ class MentorServiceTest {
         @Test
         @DisplayName("이미 PENDING 상태인 경우 예외 발생")
         void register_pending_exists_throws() {
-            // given
             given(mentorRepository.existsByUserIdAndStatus(USER_ID, MentorStatus.PENDING)).willReturn(true);
 
-            // when & then
             assertThatThrownBy(() -> mentorService.register(USER_ID, registerRequest, null))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_PENDING_EXISTS.getMessage());
@@ -293,11 +272,9 @@ class MentorServiceTest {
         @Test
         @DisplayName("이미 APPROVED 상태인 경우 예외 발생")
         void register_approved_exists_throws() {
-            // given
             given(mentorRepository.existsByUserIdAndStatus(USER_ID, MentorStatus.PENDING)).willReturn(false);
             given(mentorRepository.existsByUserIdAndStatus(USER_ID, MentorStatus.APPROVED)).willReturn(true);
 
-            // when & then
             assertThatThrownBy(() -> mentorService.register(USER_ID, registerRequest, null))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_ALREADY_APPROVED.getMessage());
@@ -315,24 +292,19 @@ class MentorServiceTest {
         @Test
         @DisplayName("정상적으로 멘토 정보 수정")
         void update_success() throws Exception {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(objectMapper.writeValueAsString(any())).willReturn("[\"판타지\"]");
 
-            // when
             MentorUpdateResponse response = mentorService.update(USER_ID, updateRequest);
 
-            // then
             assertThat(response).isNotNull();
         }
 
         @Test
         @DisplayName("멘토 프로필이 없으면 예외 발생")
         void update_mentor_not_found_throws() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
 
-            // when & then
             assertThatThrownBy(() -> mentorService.update(USER_ID, updateRequest))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());
@@ -341,13 +313,11 @@ class MentorServiceTest {
         @Test
         @DisplayName("careerHistory가 빈 문자열이면 예외 발생")
         void update_blank_career_history_throws() {
-            // given
             MentorUpdateRequest blankCareerRequest = new MentorUpdateRequest(
                     "수정된 소개글입니다", null, null, "", null, null, null, null
             );
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
 
-            // when & then
             assertThatThrownBy(() -> mentorService.update(USER_ID, blankCareerRequest))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_CAREER_REQUIRED.getMessage());
@@ -356,16 +326,13 @@ class MentorServiceTest {
         @Test
         @DisplayName("careerHistory가 null이면 기존 값 유지")
         void update_null_career_history_keeps_existing() throws Exception {
-            // given
             MentorUpdateRequest nullCareerRequest = new MentorUpdateRequest(
                     null, null, null, null, null, null, null, null
             );
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
 
-            // when
             MentorUpdateResponse response = mentorService.update(USER_ID, nullCareerRequest);
 
-            // then
             assertThat(response).isNotNull();
         }
     }
@@ -379,13 +346,10 @@ class MentorServiceTest {
         @Test
         @DisplayName("정상적으로 프로필 조회")
         void getMyProfile_success() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
 
-            // when
             MentorProfileResponse response = mentorService.getMyProfile(USER_ID);
 
-            // then
             assertThat(response).isNotNull();
             assertThat(response.status()).isEqualTo(MentorStatus.PENDING);
             assertThat(response.careerLevel()).isEqualTo(CareerLevel.INTRODUCTION);
@@ -394,30 +358,28 @@ class MentorServiceTest {
         @Test
         @DisplayName("멘토 프로필이 없으면 예외 발생")
         void getMyProfile_not_found_throws() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
 
-            // when & then
             assertThatThrownBy(() -> mentorService.getMyProfile(USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());
         }
     }
+
     @Test
     @DisplayName("동시 요청으로 DataIntegrityViolationException 발생 시 MENTOR_ALREADY_APPROVED 예외로 변환")
     void register_data_integrity_violation_throws() throws Exception {
-        // given
         given(mentorRepository.existsByUserIdAndStatus(USER_ID, MentorStatus.PENDING)).willReturn(false);
         given(mentorRepository.existsByUserIdAndStatus(USER_ID, MentorStatus.APPROVED)).willReturn(false);
         given(novelRepository.findNovelIdsByAuthorId(USER_ID)).willReturn(List.of());
         given(objectMapper.writeValueAsString(any())).willReturn("[\"판타지\"]");
         given(mentorRepository.save(any())).willThrow(DataIntegrityViolationException.class);
 
-        // when & then
         assertThatThrownBy(() -> mentorService.register(USER_ID, registerRequest, null))
                 .isInstanceOf(ServiceErrorException.class)
                 .hasMessage(MentorExceptionEnum.MENTOR_ALREADY_APPROVED.getMessage());
     }
+
     // ===================== getMyStatus 테스트 =====================
 
     @Nested
@@ -427,13 +389,10 @@ class MentorServiceTest {
         @Test
         @DisplayName("PENDING 상태 정상 조회")
         void getMyStatus_pending_success() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
 
-            // when
             MentorStatusResponse response = mentorService.getMyStatus(USER_ID);
 
-            // then
             assertThat(response).isNotNull();
             assertThat(response.status()).isEqualTo(MentorStatus.PENDING);
             assertThat(response.rejectReason()).isNull();
@@ -442,7 +401,6 @@ class MentorServiceTest {
         @Test
         @DisplayName("APPROVED 상태 정상 조회")
         void getMyStatus_approved_success() {
-            // given
             Mentor approvedMentor = Mentor.create(
                     USER_ID, CareerLevel.INTRODUCTION,
                     "[\"판타지\"]", "[\"문장력\"]", "[\"꼼꼼한 피드백형\"]",
@@ -452,10 +410,8 @@ class MentorServiceTest {
             );
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(approvedMentor));
 
-            // when
             MentorStatusResponse response = mentorService.getMyStatus(USER_ID);
 
-            // then
             assertThat(response.status()).isEqualTo(MentorStatus.APPROVED);
             assertThat(response.rejectReason()).isNull();
         }
@@ -463,7 +419,6 @@ class MentorServiceTest {
         @Test
         @DisplayName("REJECTED 상태 조회 시 rejectReason 반환")
         void getMyStatus_rejected_with_reason() {
-            // given
             Mentor rejectedMentor = Mentor.create(
                     USER_ID, CareerLevel.INTRODUCTION,
                     "[\"판타지\"]", "[\"문장력\"]", "[\"꼼꼼한 피드백형\"]",
@@ -474,10 +429,8 @@ class MentorServiceTest {
             rejectedMentor.reject("전문성 기준 미달입니다");
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(rejectedMentor));
 
-            // when
             MentorStatusResponse response = mentorService.getMyStatus(USER_ID);
 
-            // then
             assertThat(response.status()).isEqualTo(MentorStatus.REJECTED);
             assertThat(response.rejectReason()).isEqualTo("전문성 기준 미달입니다");
         }
@@ -485,15 +438,16 @@ class MentorServiceTest {
         @Test
         @DisplayName("멘토 프로필이 없으면 예외 발생")
         void getMyStatus_not_found_throws() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
 
-            // when & then
             assertThatThrownBy(() -> mentorService.getMyStatus(USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());
         }
     }
+
+    // ===================== getStatistics 테스트 =====================
+
     @Nested
     @DisplayName("멘토링 통계 조회")
     class GetStatisticsTest {
@@ -514,21 +468,16 @@ class MentorServiceTest {
         @Test
         @DisplayName("정상적으로 통계 조회")
         void getStatistics_success() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.countByMentorIdAndStatus(MENTOR_ID, MentorshipStatus.PENDING))
                     .willReturn(3L);
-            given(mentorshipRepository.countByMentorIdAndStatusAndAcceptedAtAfter(
-                    eq(MENTOR_ID), eq(MentorshipStatus.ACCEPTED), any(LocalDateTime.class)))
+            given(mentorshipRepository.countAcceptedThisMonth(eq(MENTOR_ID), any(LocalDateTime.class)))
                     .willReturn(1L);
-            given(mentorshipRepository.countRejectedThisMonth(
-                    eq(MENTOR_ID), eq(MentorshipStatus.REJECTED), any(LocalDateTime.class)))
+            given(mentorshipRepository.countRejectedThisMonth(eq(MENTOR_ID), any(LocalDateTime.class)))
                     .willReturn(2L);
 
-            // when
             MentorStatisticsResponse response = mentorService.getStatistics(USER_ID);
 
-            // then
             assertThat(response).isNotNull();
             assertThat(response.pendingCount()).isEqualTo(3L);
             assertThat(response.thisMonthAcceptedCount()).isEqualTo(1L);
@@ -538,17 +487,13 @@ class MentorServiceTest {
         @Test
         @DisplayName("통계가 모두 0인 경우 정상 조회")
         void getStatistics_all_zero() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.countByMentorIdAndStatus(any(), any())).willReturn(0L);
-            given(mentorshipRepository.countByMentorIdAndStatusAndAcceptedAtAfter(any(), any(), any()))
-                    .willReturn(0L);
-            given(mentorshipRepository.countRejectedThisMonth(any(), any(), any())).willReturn(0L);
+            given(mentorshipRepository.countAcceptedThisMonth(any(), any())).willReturn(0L);
+            given(mentorshipRepository.countRejectedThisMonth(any(), any())).willReturn(0L);
 
-            // when
             MentorStatisticsResponse response = mentorService.getStatistics(USER_ID);
 
-            // then
             assertThat(response.pendingCount()).isEqualTo(0L);
             assertThat(response.thisMonthAcceptedCount()).isEqualTo(0L);
             assertThat(response.thisMonthRejectedCount()).isEqualTo(0L);
@@ -557,15 +502,16 @@ class MentorServiceTest {
         @Test
         @DisplayName("멘토 프로필이 없으면 예외 발생")
         void getStatistics_mentor_not_found_throws() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
 
-            // when & then
             assertThatThrownBy(() -> mentorService.getStatistics(USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());
         }
     }
+
+    // ===================== getMyMentees 테스트 =====================
+
     @Nested
     @DisplayName("내 멘티 목록 조회")
     class GetMyMenteesTest {
@@ -577,7 +523,8 @@ class MentorServiceTest {
 
         @BeforeEach
         void setUp() {
-            mentorship = Mentorship.create(MENTOR_ENTITY_ID, 501L, 100L, "신청 동기", "https://s3.amazonaws.com/file.pdf");
+            mentorship = Mentorship.create(MENTOR_ENTITY_ID, 501L, 100L, "신청 동기",
+                    "https://s3.amazonaws.com/file.pdf", "자바 백엔드 로드맵");
             mentorship.approve();
 
             try {
@@ -605,7 +552,6 @@ class MentorServiceTest {
         @Test
         @DisplayName("정상 조회 - 멘티 목록 반환")
         void getMyMentees_success() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findAllByMentorIdAndStatus(MENTOR_ENTITY_ID, MentorshipStatus.ACCEPTED))
                     .willReturn(List.of(mentorship));
@@ -614,10 +560,8 @@ class MentorServiceTest {
             given(mentorFeedbackRepository.findTopByMentorshipIdOrderByCreatedAtDesc(10L))
                     .willReturn(Optional.empty());
 
-            // when
             List<MenteeInfoResponse> result = mentorService.getMyMentees(USER_ID);
 
-            // then
             assertThat(result).hasSize(1);
             assertThat(result.get(0).menteeName()).isEqualTo("홍길동");
             assertThat(result.get(0).novelTitle()).isEqualTo("자바 백엔드 로드맵");
@@ -628,10 +572,8 @@ class MentorServiceTest {
         @Test
         @DisplayName("최근 피드백이 있는 경우 lastFeedbackAt 반환")
         void getMyMentees_with_last_feedback() {
-            // given
             MentorFeedback feedback = MentorFeedback.create(10L, USER_ID, "피드백 내용");
 
-            // Reflection으로 createdAt 설정
             try {
                 java.lang.reflect.Field createdAtField = feedback.getClass().getSuperclass().getDeclaredField("createdAt");
                 createdAtField.setAccessible(true);
@@ -648,17 +590,14 @@ class MentorServiceTest {
             given(mentorFeedbackRepository.findTopByMentorshipIdOrderByCreatedAtDesc(10L))
                     .willReturn(Optional.of(feedback));
 
-            // when
             List<MenteeInfoResponse> result = mentorService.getMyMentees(USER_ID);
 
-            // then
             assertThat(result.get(0).lastFeedbackAt()).isNotNull();
         }
 
         @Test
         @DisplayName("멘티가 탈퇴한 경우 알 수 없는 사용자 반환")
         void getMyMentees_deleted_mentee() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findAllByMentorIdAndStatus(MENTOR_ENTITY_ID, MentorshipStatus.ACCEPTED))
                     .willReturn(List.of(mentorship));
@@ -667,17 +606,14 @@ class MentorServiceTest {
             given(mentorFeedbackRepository.findTopByMentorshipIdOrderByCreatedAtDesc(10L))
                     .willReturn(Optional.empty());
 
-            // when
             List<MenteeInfoResponse> result = mentorService.getMyMentees(USER_ID);
 
-            // then
             assertThat(result.get(0).menteeName()).isEqualTo("알 수 없는 사용자");
         }
 
         @Test
         @DisplayName("소설이 없는 경우 알 수 없는 소설 반환")
         void getMyMentees_deleted_novel() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findAllByMentorIdAndStatus(MENTOR_ENTITY_ID, MentorshipStatus.ACCEPTED))
                     .willReturn(List.of(mentorship));
@@ -686,40 +622,36 @@ class MentorServiceTest {
             given(mentorFeedbackRepository.findTopByMentorshipIdOrderByCreatedAtDesc(10L))
                     .willReturn(Optional.empty());
 
-            // when
             List<MenteeInfoResponse> result = mentorService.getMyMentees(USER_ID);
 
-            // then
             assertThat(result.get(0).novelTitle()).isEqualTo("알 수 없는 소설");
         }
 
         @Test
         @DisplayName("멘티가 없는 경우 빈 리스트 반환")
         void getMyMentees_empty() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findAllByMentorIdAndStatus(MENTOR_ENTITY_ID, MentorshipStatus.ACCEPTED))
                     .willReturn(List.of());
 
-            // when
             List<MenteeInfoResponse> result = mentorService.getMyMentees(USER_ID);
 
-            // then
             assertThat(result).isEmpty();
         }
 
         @Test
         @DisplayName("멘토 프로필이 없으면 예외 발생")
         void getMyMentees_mentor_not_found_throws() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
 
-            // when & then
             assertThatThrownBy(() -> mentorService.getMyMentees(USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());
         }
     }
+
+    // ===================== getStatisticsDetail 테스트 =====================
+
     @Nested
     @DisplayName("멘토링 통계 상세 조회")
     class GetStatisticsDetailTest {
@@ -740,16 +672,13 @@ class MentorServiceTest {
         @Test
         @DisplayName("정상적으로 통계 상세 조회")
         void getStatisticsDetail_success() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipReviewRepository.countTotalMenteesByMentorId(MENTOR_ENTITY_ID)).willReturn(12L);
             given(mentorshipReviewRepository.countCompletedSessionsByMentorId(MENTOR_ENTITY_ID)).willReturn(34L);
             given(mentorshipReviewRepository.findAverageRatingByMentorId(MENTOR_ENTITY_ID)).willReturn(4.9);
 
-            // when
             MentorStatisticsDetailResponse response = mentorService.getStatisticsDetail(USER_ID);
 
-            // then
             assertThat(response).isNotNull();
             assertThat(response.totalMentees()).isEqualTo(12L);
             assertThat(response.completedSessions()).isEqualTo(34L);
@@ -759,16 +688,13 @@ class MentorServiceTest {
         @Test
         @DisplayName("리뷰가 없는 경우 만족도 0.0 반환")
         void getStatisticsDetail_no_reviews() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipReviewRepository.countTotalMenteesByMentorId(MENTOR_ENTITY_ID)).willReturn(0L);
             given(mentorshipReviewRepository.countCompletedSessionsByMentorId(MENTOR_ENTITY_ID)).willReturn(0L);
             given(mentorshipReviewRepository.findAverageRatingByMentorId(MENTOR_ENTITY_ID)).willReturn(null);
 
-            // when
             MentorStatisticsDetailResponse response = mentorService.getStatisticsDetail(USER_ID);
 
-            // then
             assertThat(response.totalMentees()).isEqualTo(0L);
             assertThat(response.completedSessions()).isEqualTo(0L);
             assertThat(response.averageSatisfaction()).isEqualTo(0.0);
@@ -777,26 +703,21 @@ class MentorServiceTest {
         @Test
         @DisplayName("만족도 소수점 첫째 자리 반올림 확인")
         void getStatisticsDetail_rating_rounded() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipReviewRepository.countTotalMenteesByMentorId(MENTOR_ENTITY_ID)).willReturn(5L);
             given(mentorshipReviewRepository.countCompletedSessionsByMentorId(MENTOR_ENTITY_ID)).willReturn(10L);
             given(mentorshipReviewRepository.findAverageRatingByMentorId(MENTOR_ENTITY_ID)).willReturn(4.85);
 
-            // when
             MentorStatisticsDetailResponse response = mentorService.getStatisticsDetail(USER_ID);
 
-            // then
             assertThat(response.averageSatisfaction()).isEqualTo(4.9);
         }
 
         @Test
         @DisplayName("멘토 프로필이 없으면 예외 발생")
         void getStatisticsDetail_mentor_not_found_throws() {
-            // given
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
 
-            // when & then
             assertThatThrownBy(() -> mentorService.getStatisticsDetail(USER_ID))
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessage(MentorExceptionEnum.MENTOR_NOT_FOUND.getMessage());

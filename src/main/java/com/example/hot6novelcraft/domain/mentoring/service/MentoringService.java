@@ -41,6 +41,7 @@ public class MentoringService {
         Mentor mentor = mentorRepository.findByUserId(userId)
                 .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
 
+        // TODO: 고도화 시 QueryDSL로 멘티명/소설명 JOIN 조회로 교체 (현재 N+1 발생 가능)
         return mentorshipRepository.findAllByMentorIdOrderByCreatedAtDesc(mentor.getId(), pageable)
                 .map(mentorship -> {
                     String menteeName = userRepository.findByIdAndIsDeletedFalse(mentorship.getMenteeId())

@@ -18,17 +18,15 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
     // 대기 중 건수
     long countByMentorIdAndStatus(Long mentorId, MentorshipStatus status);
 
-    // 이번 달 수락/거절 건수
-    @Query("SELECT COUNT(m) FROM Mentorship m WHERE m.mentorId = :mentorId AND m.status = :status AND m.acceptedAt >= :startOfMonth")
-    long countByMentorIdAndStatusAndAcceptedAtAfter(@Param("mentorId") Long mentorId,
-                                                    @Param("status") MentorshipStatus status,
-                                                    @Param("startOfMonth") LocalDateTime startOfMonth);
+    // 이번 달 수락 건수 - acceptedAt 기준으로 집계 (COMPLETED로 변경되어도 누락 없음)
+    @Query("SELECT COUNT(m) FROM Mentorship m WHERE m.mentorId = :mentorId AND m.acceptedAt >= :startOfMonth")
+    long countAcceptedThisMonth(@Param("mentorId") Long mentorId,
+                                @Param("startOfMonth") LocalDateTime startOfMonth);
 
-    @Query("SELECT COUNT(m) FROM Mentorship m WHERE m.mentorId = :mentorId AND m.status = :status AND m.rejectedAt >= :startOfMonth")
+    // 이번 달 거절 건수 - rejectedAt 기준으로 집계
+    @Query("SELECT COUNT(m) FROM Mentorship m WHERE m.mentorId = :mentorId AND m.rejectedAt >= :startOfMonth")
     long countRejectedThisMonth(@Param("mentorId") Long mentorId,
-                                @Param("status") MentorshipStatus status,
                                 @Param("startOfMonth") LocalDateTime startOfMonth);
 
     List<Mentorship> findAllByMentorIdAndStatus(Long mentorId, MentorshipStatus status);
-
 }

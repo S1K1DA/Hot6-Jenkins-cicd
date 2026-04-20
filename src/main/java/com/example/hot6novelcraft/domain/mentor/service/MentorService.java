@@ -12,7 +12,6 @@ import com.example.hot6novelcraft.domain.mentor.entity.MentorFeedback;
 import com.example.hot6novelcraft.domain.mentor.entity.enums.MentorStatus;
 import com.example.hot6novelcraft.domain.mentor.repository.MentorFeedbackRepository;
 import com.example.hot6novelcraft.domain.mentor.repository.MentorRepository;
-import com.example.hot6novelcraft.domain.mentor.dto.response.MentorStatisticsDetailResponse;
 import com.example.hot6novelcraft.domain.mentoring.entity.enums.MentorshipStatus;
 import com.example.hot6novelcraft.domain.mentoring.repository.MentorshipRepository;
 import com.example.hot6novelcraft.domain.mentoring.repository.MentorshipReviewRepository;
@@ -50,7 +49,6 @@ public class MentorService {
     private final EpisodeRepository episodeRepository;
     private final ObjectMapper objectMapper;
     private final MentorshipReviewRepository mentorshipReviewRepository;
-
 
     /**
      * 멘토 등록 신청
@@ -142,8 +140,8 @@ public class MentorService {
     /**
      * 내 멘토링 통계 조회 - 좌측 상단
      * - 대기 중 건수
-     * - 이번 달 수락 건수
-     * - 이번 달 거절 건수
+     * - 이번 달 수락 건수 (acceptedAt 기준, COMPLETED 상태여도 누락 없음)
+     * - 이번 달 거절 건수 (rejectedAt 기준)
      */
     @Transactional(readOnly = true)
     public MentorStatisticsResponse getStatistics(Long userId) {
@@ -156,17 +154,18 @@ public class MentorService {
         long pendingCount = mentorshipRepository.countByMentorIdAndStatus(
                 mentor.getId(), MentorshipStatus.PENDING);
 
-        long thisMonthAcceptedCount = mentorshipRepository.countByMentorIdAndStatusAndAcceptedAtAfter(
-                mentor.getId(), MentorshipStatus.ACCEPTED, startOfMonth);
+        long thisMonthAcceptedCount = mentorshipRepository.countAcceptedThisMonth(
+                mentor.getId(), startOfMonth);
 
         long thisMonthRejectedCount = mentorshipRepository.countRejectedThisMonth(
-                mentor.getId(), MentorshipStatus.REJECTED, startOfMonth);
+                mentor.getId(), startOfMonth);
 
         return MentorStatisticsResponse.of(pendingCount, thisMonthAcceptedCount, thisMonthRejectedCount);
     }
 
     /**
      * 내 멘티 목록 조회 - ACCEPTED 상태인 멘티만
+     * TODO: 고도화 시 QueryDSL로 멘티명/소설명 JOIN 조회로 교체 (현재 N+1 발생 가능)
      */
     @Transactional(readOnly = true)
     public List<MenteeInfoResponse> getMyMentees(Long userId) {
@@ -193,6 +192,24 @@ public class MentorService {
                     return MenteeInfoResponse.of(mentorship, menteeName, novelTitle, lastFeedbackAt);
                 })
                 .toList();
+    }
+
+    /**
+     * 내 멘토링 통계 상세 조회 - 우측 멘토링 통계
+     * - 총 멘티 수
+     * - 완료 세션 수
+     * - 평균 만족도
+     */
+    @Transactional(readOnly = true)
+    public MentorStatisticsDetailResponse getStatisticsDetail(Long userId) {
+        Mentor mentor = mentorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
+
+        long totalMentees = mentorshipReviewRepository.countTotalMenteesByMentorId(mentor.getId());
+        long completedSessions = mentorshipReviewRepository.countCompletedSessionsByMentorId(mentor.getId());
+        Double averageSatisfaction = mentorshipReviewRepository.findAverageRatingByMentorId(mentor.getId());
+
+        return MentorStatisticsDetailResponse.of(totalMentees, completedSessions, averageSatisfaction);
     }
 
     /**
@@ -250,22 +267,5 @@ public class MentorService {
         } catch (JsonProcessingException e) {
             throw new ServiceErrorException(MentorExceptionEnum.MENTOR_JSON_SERIALIZE_FAILED);
         }
-    }
-    /**
-     * 내 멘토링 통계 상세 조회 - 우측 멘토링 통계
-     * - 총 멘티 수
-     * - 완료 세션 수
-     * - 평균 만족도
-     */
-    @Transactional(readOnly = true)
-    public MentorStatisticsDetailResponse getStatisticsDetail(Long userId) {
-        Mentor mentor = mentorRepository.findByUserId(userId)
-                .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
-
-        long totalMentees = mentorshipReviewRepository.countTotalMenteesByMentorId(mentor.getId());
-        long completedSessions = mentorshipReviewRepository.countCompletedSessionsByMentorId(mentor.getId());
-        Double averageSatisfaction = mentorshipReviewRepository.findAverageRatingByMentorId(mentor.getId());
-
-        return MentorStatisticsDetailResponse.of(totalMentees, completedSessions, averageSatisfaction);
     }
 }

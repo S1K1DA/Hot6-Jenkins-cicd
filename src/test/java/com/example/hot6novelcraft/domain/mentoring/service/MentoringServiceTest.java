@@ -26,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -436,13 +437,14 @@ class MentoringServiceTest {
         @DisplayName("정상 종료 - 슬롯 반환 및 상태 변경")
         void completeMentoring_success() {
             mentorship.approve();
+            mentor.decreaseSlot(); // 수락 시점 슬롯 차감 반영 (3 → 2)
             given(mentorRepository.findByUserId(USER_ID)).willReturn(Optional.of(mentor));
             given(mentorshipRepository.findById(MENTORING_ID)).willReturn(Optional.of(mentorship));
 
             mentoringService.completeMentoring(MENTORING_ID, USER_ID);
 
             assertThat(mentorship.getStatus()).isEqualTo(MentorshipStatus.COMPLETED);
-            assertThat(mentor.getMaxMentees()).isEqualTo(4); // 3 + 1
+            assertThat(mentor.getMaxMentees()).isEqualTo(3); // 2 + 1 → 원래값으로 복구
         }
 
         @Test
@@ -630,10 +632,17 @@ class MentoringServiceTest {
             MentoringFeedbackResponse response =
                     mentoringService.createFeedback(MENTORING_ID, USER_ID, request);
 
+            // ArgumentCaptor로 실제 저장된 엔티티 검증
+            ArgumentCaptor<MentorFeedback> captor = ArgumentCaptor.forClass(MentorFeedback.class);
+            verify(mentorFeedbackRepository, times(1)).save(captor.capture());
+            MentorFeedback saved = captor.getValue();
+
             assertThat(response).isNotNull();
             assertThat(response.content()).isEqualTo("ERD 설계 및 API 명세 작성");
             assertThat(mentorship.getTotalSessions()).isEqualTo(1);
-            verify(mentorFeedbackRepository, times(1)).save(any());
+            assertThat(saved.getMentorshipId()).isEqualTo(MENTORING_ID);   // 잘못된 mentoringId 방지
+            assertThat(saved.getAuthorId()).isEqualTo(MENTOR_ENTITY_ID);   // 잘못된 mentorId 방지
+            assertThat(saved.getContent()).isEqualTo("ERD 설계 및 API 명세 작성");
         }
 
         @Test

@@ -14,6 +14,8 @@ public interface MentorshipReviewRepository extends JpaRepository<MentorshipRevi
     @Query("SELECT COUNT(m) FROM Mentorship m WHERE m.mentorId = :mentorId AND m.status = 'COMPLETED'")
     long countCompletedSessionsByMentorId(@Param("mentorId") Long mentorId);
 
-    @Query("SELECT COUNT(DISTINCT m.menteeId) FROM Mentorship m WHERE m.mentorId = :mentorId")
+    @Query("SELECT COUNT(DISTINCT m.menteeId) FROM Mentorship m " +
+            "WHERE m.mentorId = :mentorId " +
+            "AND m.status IN ('ACCEPTED', 'COMPLETED')")
     long countTotalMenteesByMentorId(@Param("mentorId") Long mentorId);
 }

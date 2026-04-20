@@ -1,4 +1,4 @@
-package com.example.hot6novelcraft.domain.mentorship.entity;
+package com.example.hot6novelcraft.domain.mentoring.entity.enums;
 
 public enum MentorshipStatus {
     PENDING,    // 대기

@@ -1,6 +1,8 @@
 package com.example.hot6novelcraft.domain.mentor.entity;
 
 import com.example.hot6novelcraft.common.entity.BaseEntity;
+import com.example.hot6novelcraft.common.exception.ServiceErrorException;
+import com.example.hot6novelcraft.common.exception.domain.MentorExceptionEnum;
 import com.example.hot6novelcraft.domain.mentor.entity.enums.MentorStatus;
 import com.example.hot6novelcraft.domain.user.entity.enums.CareerLevel;
 import jakarta.persistence.*;
@@ -51,6 +53,33 @@ public class Mentor extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private MentorStatus status;
+
+    @Column(length = 500)
+    private String rejectReason;
+
+    @Version
+    private Long version;
+
+    public void approve() {
+        this.status = MentorStatus.APPROVED;
+        this.rejectReason = null;
+    }
+
+    public void reject(String rejectReason) {
+        this.status = MentorStatus.REJECTED;
+        this.rejectReason = rejectReason;
+    }
+
+    public void decreaseSlot() {
+        if (this.maxMentees <= 0) {
+            throw new ServiceErrorException(MentorExceptionEnum.MENTOR_MAX_MENTEES_EXCEEDED);
+        }
+        this.maxMentees--;
+    }
+
+    public void increaseSlot() {
+        this.maxMentees++;
+    }
 
     private Mentor(Long userId, CareerLevel careerLevel, String mainGenres, String specialFields,
                    String mentoringStyle, String bio, String awardsCareer,

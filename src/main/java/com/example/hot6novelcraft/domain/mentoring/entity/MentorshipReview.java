@@ -1,4 +1,4 @@
-package com.example.hot6novelcraft.domain.mentorship.entity;
+package com.example.hot6novelcraft.domain.mentoring.entity;
 
 import com.example.hot6novelcraft.common.entity.BaseEntity;
 import jakarta.persistence.*;

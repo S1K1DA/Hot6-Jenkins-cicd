@@ -6,14 +6,20 @@ import com.example.hot6novelcraft.domain.episode.entity.enums.EpisodeStatus;
 import com.example.hot6novelcraft.domain.episode.repository.EpisodeRepository;
 import com.example.hot6novelcraft.domain.mentor.dto.request.MentorRegisterRequest;
 import com.example.hot6novelcraft.domain.mentor.dto.request.MentorUpdateRequest;
-import com.example.hot6novelcraft.domain.mentor.dto.response.MentorProfileResponse;
-import com.example.hot6novelcraft.domain.mentor.dto.response.MentorRegisterResponse;
-import com.example.hot6novelcraft.domain.mentor.dto.response.MentorUpdateResponse;
+import com.example.hot6novelcraft.domain.mentor.dto.response.*;
 import com.example.hot6novelcraft.domain.mentor.entity.Mentor;
+import com.example.hot6novelcraft.domain.mentor.entity.MentorFeedback;
 import com.example.hot6novelcraft.domain.mentor.entity.enums.MentorStatus;
+import com.example.hot6novelcraft.domain.mentor.repository.MentorFeedbackRepository;
 import com.example.hot6novelcraft.domain.mentor.repository.MentorRepository;
+import com.example.hot6novelcraft.domain.mentoring.entity.enums.MentorshipStatus;
+import com.example.hot6novelcraft.domain.mentoring.repository.MentorshipRepository;
+import com.example.hot6novelcraft.domain.mentoring.repository.MentorshipReviewRepository;
+import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
+import com.example.hot6novelcraft.domain.user.entity.User;
 import com.example.hot6novelcraft.domain.user.entity.enums.CareerLevel;
+import com.example.hot6novelcraft.domain.user.repository.UserRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -36,15 +42,16 @@ public class MentorService {
     private static final long INTERMEDIATE_MIN_LIKES = 100L;
 
     private final MentorRepository mentorRepository;
+    private final MentorshipRepository mentorshipRepository;
+    private final MentorFeedbackRepository mentorFeedbackRepository;
+    private final UserRepository userRepository;
     private final NovelRepository novelRepository;
     private final EpisodeRepository episodeRepository;
     private final ObjectMapper objectMapper;
+    private final MentorshipReviewRepository mentorshipReviewRepository;
 
     /**
      * 멘토 등록 신청
-     * - PENDING 또는 APPROVED 상태의 기존 신청이 있으면 중복 신청 불가
-     * - careerLevel 기준으로 입문/중급 자동 승인, 전문은 PENDING 유지
-     * - 동시 요청으로 DataIntegrityViolationException 발생 시 중복 처리
      */
     @Transactional
     public MentorRegisterResponse register(Long userId, MentorRegisterRequest request,
@@ -84,8 +91,6 @@ public class MentorService {
 
     /**
      * 멘토 정보 수정
-     * - null 필드는 기존 값 유지 (부분 업데이트)
-     * - 빈 리스트([])는 명시적으로 비우기
      */
     @Transactional
     public MentorUpdateResponse update(Long userId, MentorUpdateRequest request) {
@@ -119,6 +124,92 @@ public class MentorService {
                 .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
 
         return MentorProfileResponse.from(mentor);
+    }
+
+    /**
+     * 내 멘토 등록 상태 조회
+     */
+    @Transactional(readOnly = true)
+    public MentorStatusResponse getMyStatus(Long userId) {
+        Mentor mentor = mentorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
+
+        return MentorStatusResponse.from(mentor);
+    }
+
+    /**
+     * 내 멘토링 통계 조회 - 좌측 상단
+     * - 대기 중 건수
+     * - 이번 달 수락 건수 (acceptedAt 기준, COMPLETED 상태여도 누락 없음)
+     * - 이번 달 거절 건수 (rejectedAt 기준)
+     */
+    @Transactional(readOnly = true)
+    public MentorStatisticsResponse getStatistics(Long userId) {
+        Mentor mentor = mentorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
+
+        LocalDateTime startOfMonth = LocalDateTime.now()
+                .withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
+
+        long pendingCount = mentorshipRepository.countByMentorIdAndStatus(
+                mentor.getId(), MentorshipStatus.PENDING);
+
+        long thisMonthAcceptedCount = mentorshipRepository.countAcceptedThisMonth(
+                mentor.getId(), startOfMonth);
+
+        long thisMonthRejectedCount = mentorshipRepository.countRejectedThisMonth(
+                mentor.getId(), startOfMonth);
+
+        return MentorStatisticsResponse.of(pendingCount, thisMonthAcceptedCount, thisMonthRejectedCount);
+    }
+
+    /**
+     * 내 멘티 목록 조회 - ACCEPTED 상태인 멘티만
+     * TODO: 고도화 시 QueryDSL로 멘티명/소설명 JOIN 조회로 교체 (현재 N+1 발생 가능)
+     */
+    @Transactional(readOnly = true)
+    public List<MenteeInfoResponse> getMyMentees(Long userId) {
+        Mentor mentor = mentorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
+
+        return mentorshipRepository.findAllByMentorIdAndStatus(mentor.getId(), MentorshipStatus.ACCEPTED)
+                .stream()
+                .map(mentorship -> {
+                    String menteeName = userRepository.findByIdAndIsDeletedFalse(mentorship.getMenteeId())
+                            .map(User::getNickname)
+                            .orElse("알 수 없는 사용자");
+
+                    // TODO: 고도화 시 NovelRepository에 findByIdAndIsDeletedFalse 추가 후 교체
+                    String novelTitle = novelRepository.findById(mentorship.getCurrentNovelId())
+                            .map(Novel::getTitle)
+                            .orElse("알 수 없는 소설");
+
+                    LocalDateTime lastFeedbackAt = mentorFeedbackRepository
+                            .findTopByMentorshipIdOrderByCreatedAtDesc(mentorship.getId())
+                            .map(MentorFeedback::getCreatedAt)
+                            .orElse(null);
+
+                    return MenteeInfoResponse.of(mentorship, menteeName, novelTitle, lastFeedbackAt);
+                })
+                .toList();
+    }
+
+    /**
+     * 내 멘토링 통계 상세 조회 - 우측 멘토링 통계
+     * - 총 멘티 수
+     * - 완료 세션 수
+     * - 평균 만족도
+     */
+    @Transactional(readOnly = true)
+    public MentorStatisticsDetailResponse getStatisticsDetail(Long userId) {
+        Mentor mentor = mentorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
+
+        long totalMentees = mentorshipReviewRepository.countTotalMenteesByMentorId(mentor.getId());
+        long completedSessions = mentorshipReviewRepository.countCompletedSessionsByMentorId(mentor.getId());
+        Double averageSatisfaction = mentorshipReviewRepository.findAverageRatingByMentorId(mentor.getId());
+
+        return MentorStatisticsDetailResponse.of(totalMentees, completedSessions, averageSatisfaction);
     }
 
     /**
@@ -156,9 +247,6 @@ public class MentorService {
         return file.getOriginalFilename();
     }
 
-    /**
-     * 등록용 직렬화 - null과 빈 리스트 둘 다 null 반환
-     */
     private String toJson(List<String> list) {
         if (list == null || list.isEmpty()) {
             return null;
@@ -170,9 +258,6 @@ public class MentorService {
         }
     }
 
-    /**
-     * 수정용 직렬화 - null이면 null 반환(기존 값 유지), 빈 리스트면 "[]" 반환(명시적 비우기)
-     */
     private String toJsonForUpdate(List<String> list) {
         if (list == null) {
             return null;

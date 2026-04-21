@@ -10,15 +10,19 @@ import com.example.hot6novelcraft.domain.mentoring.dto.response.MentoringReceive
 import com.example.hot6novelcraft.domain.mentoring.service.MentoringService;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
+@Validated  // @Min, @Max 동작을 위해 추가
 public class MentoringController {
 
     private final MentoringService mentoringService;
@@ -80,8 +84,11 @@ public class MentoringController {
     @GetMapping("/api/v1/mentorings/received")
     public ResponseEntity<BaseResponse<PageResponse<MentoringReceivedResponse>>> getReceivedMentoringsV1(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = "0")
+            @Min(value = 0, message = "페이지는 0 이상이어야 합니다") int page,
+            @RequestParam(defaultValue = "10")
+            @Min(value = 1, message = "사이즈는 1 이상이어야 합니다")
+            @Max(value = 100, message = "사이즈는 100 이하여야 합니다") int size
     ) {
         return ResponseEntity.ok(
                 BaseResponse.success("COMMON-200", "접수된 멘토링 목록 조회가 완료되었습니다",
@@ -94,8 +101,11 @@ public class MentoringController {
     @GetMapping("/api/v2/mentorings/received")
     public ResponseEntity<BaseResponse<PageResponse<MentoringReceivedResponse>>> getReceivedMentoringsV2(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = "0")
+            @Min(value = 0, message = "페이지는 0 이상이어야 합니다") int page,
+            @RequestParam(defaultValue = "10")
+            @Min(value = 1, message = "사이즈는 1 이상이어야 합니다")
+            @Max(value = 100, message = "사이즈는 100 이하여야 합니다") int size
     ) {
         return ResponseEntity.ok(
                 BaseResponse.success("COMMON-200", "접수된 멘토링 목록 조회가 완료되었습니다",

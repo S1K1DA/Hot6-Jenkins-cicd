@@ -24,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.Optional;
 
 @Slf4j(topic = "SignupService")
@@ -83,8 +84,8 @@ public class SignupService {
     1. 공통 회원가입
         - 독자/작가 추가 정보 기입까지 완료 후, DB 저장 및 임시 JWT 발급으로 보안 설정
         - SMS 전송 및 인증
-    2. 독자 회원가입 - 임시 JWT로만 접근 가능
-    3. 작가 회원가입 - 임시 JWT로만 접근 가능
+    2. 독자 회원가입 - 임시 JWT로만 접근 가능, 하단 공통 메소드로 소셜/일반 분리
+    3. 작가 회원가입 - 임시 JWT로만 접근 가능, 하단 공통 메소드로 소셜/일반 분리
     4. 관리자 회원가입 - 이메일, 비밀번호, 핸드폰 인증만 진행
     ============================= */
     @Transactional
@@ -98,24 +99,22 @@ public class SignupService {
         checkNickname(request.nickname());
 
         String encoderPassword = passwordEncoder.encode(request.password());
-        User user = User.register(
+
+        // Redis 임시 토큰 Temp에 담을 정보
+        TempSignupRequest tempRequest = new TempSignupRequest(
                 request.email(),
                 encoderPassword,
                 request.nickname(),
                 request.phoneNo(),
-                request.birthDay(),
-                UserRole.TEMP  // 임시 역할 부여
+                request.birthDay()
         );
-
-        userRepository.save(user);
-
-        // DB update 강제 반영
-        userRepository.flush();
+        String redisKey = "TEMP_SIGNUP:" + request.email();
+        redisUtil.set(redisKey, tempRequest, 10);
 
         // DB 저장이 확실해 Redis 인증 정보 삭제
         consumerPhoneVerification(request.phoneNo());
 
-        log.info("공통 회원가입 완료 - email: {}", request.email());
+        log.info("공통 회원가입 임시 보관 완료 - email: {}", request.email());
 
         // 임시 JWT 유저 저장 (독자/작가 추가 가입 전 임시 상태)
         return jwtUtil.createTempToken(request.email());
@@ -124,54 +123,47 @@ public class SignupService {
     @Transactional
     public SignupResponse readerSignup(ReaderSignupRequest request, String email) {
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
+        // 먼저 소셜 가입이 있는지 확인
+        String socialKey = "TEMP_SOCIAL_SIGNUP:" + email;
+        TempSocialSignupRequest tempSocialSignupRequest = (TempSocialSignupRequest) redisUtil.get(socialKey);
 
-        if(!user.getRole().equals(UserRole.TEMP)) {
-            throw new ServiceErrorException(UserExceptionEnum.ERR_ALREADY_COMPLETED_SIGNUP);
+        if (tempSocialSignupRequest != null) {
+            return processSocialReaderSignup(request, email, tempSocialSignupRequest, socialKey);
         }
 
-        user.changeRole(UserRole.READER);
+        // 소셜 가입자가 없다면 "일반 회원 가입" 사용자가 있는지 확인
+        String redisKey = "TEMP_SIGNUP:" + email;
+        TempSignupRequest tempRequest = (TempSignupRequest) redisUtil.get(redisKey);
 
-        ReaderProfile readerProfile = ReaderProfile.register(
-                user.getId(),
-                request.mainGenreToString(),
-                request.readingGoal()
-        );
-        readerProfileRepository.save(readerProfile);
+        if (tempRequest != null) {
+            return processNormalReaderSignup(request, email, tempRequest, redisKey);
+        }
 
-        log.info("독자 정보 추가 가입 완료 - email: {}", email);
-
-        return SignupResponse.of(user);
+        // 둘 다 없으면 예외 처리
+        throw new ServiceErrorException(UserExceptionEnum.ERR_INVALID_TOKEN);
     }
 
     @Transactional
     public SignupResponse authorSignup(AuthorRequest request, String email) {
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
+        // 먼저 소셜 가입이 있는지 확인
+        String socialKey = "TEMP_SOCIAL_SIGNUP:" + email;
+        TempSocialSignupRequest tempSocialSignupRequest = (TempSocialSignupRequest) redisUtil.get(socialKey);
 
-        if (!user.getRole().equals(UserRole.TEMP)) {
-            throw new ServiceErrorException(UserExceptionEnum.ERR_ALREADY_COMPLETED_SIGNUP);
+        if(tempSocialSignupRequest != null) {
+            return processSocialAuthorSignup(request, email, tempSocialSignupRequest, socialKey);
         }
 
-        user.changeRole(UserRole.AUTHOR);
+        // 소셜 가입자가 없다면 "일반 회원 가입" 사용자가 있는지 확인
+        String normalKey = "TEMP_SIGNUP:" + email;
+        TempSignupRequest tempRequest = (TempSignupRequest) redisUtil.get(normalKey);
 
-        AuthorProfile authorProfile = AuthorProfile.register(
-                user.getId(),
-                request.bio(),
-                request.careerLevel(),
-                request.mainGenreToString(),
-                request.instagramLinks(),
-                request.xLinks(),
-                request.blogLinks(),
-                request.allowMenteeRequest()
-        );
-        authorProfileRepository.save(authorProfile);
+        if(tempRequest != null) {
+            return processNormalAuthorSignup(request, email, tempRequest, normalKey);
+        }
 
-        log.info("작가 정보 추가 가입 완료 - email: {}", email);
-
-        return SignupResponse.of(user);
+        // 둘 다 없으면 예외 처리
+        throw new ServiceErrorException(UserExceptionEnum.ERR_INVALID_TOKEN);
     }
 
     @Transactional
@@ -202,45 +194,184 @@ public class SignupService {
         return AdminSignupResponse.of(admin);
     }
 
-    /** ======== 소셜 회원 가입 ======== */
+    /** ======== 소셜 회원 가입 ========
+     1. 소셜 공통 회원 가입 - 번호 인증 필요, 닉네임, 생일 입력
+     2. 소셜 독자 회원 가입 - private
+     3. 소셜 작가 회원 가입 - private
+     ============================= */
     @Transactional
     public SocialSignupResponse socialCommonSignup(SocialSignupRequest request, String email, String providerId, ProviderSns providerSns) {
 
-        // SMS 공통 메서드 (검증만)
+        // SMS 공통 메서드 및 닉네임 중복 검증
         validatePhoneVerification(request.phoneNo());
-
         checkNickname(request.nickname());
 
-        // 소셜 유저 생성 (비밀번호는 SOCIAL LOGIN으로 고정
+        // 소셜 유저 검증 - 탈퇴 유예 기간 유저인지 체크 및 비밀번호는 SOCIAL LOGIN으로 고정
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
 
-        // 탈퇴 유예 기간 유저인지 체크
         if (user.isDeleted()) {
             throw new ServiceErrorException(UserExceptionEnum.ERR_USER_WITHDRAWAL_PENDING_CONFLICT);
         }
 
-        user.updateForSocialSignup(request.nickname(), request.phoneNo(), request.birthDay());
-
-        // sns 정보 저장
-        SocialAuth socialAuth = SocialAuth.register(
-                ProviderSns.GOOGLE
-                , providerId
-                , user.getId()
+        // 1단계 정보 DTP에 담기
+        TempSocialSignupRequest tempSocialSignupRequest = new TempSocialSignupRequest(
+                providerId
+                , providerSns
+                , request.nickname()
+                , request.phoneNo()
+                , request.birthDay()
         );
-        socialAuthRepository.save(socialAuth);
 
-        // DB 강제 저장 후, 저장 완료와 동시에 Redis 키 삭제
-        userRepository.flush();
-        socialAuthRepository.flush();
+        // DTO를 Redis에 보관 (TTL 10분)
+        String redisKey = "TEMP_SOCIAL_SIGNUP:" + email;
+        redisUtil.set(redisKey, tempSocialSignupRequest, 10);
 
+        // 처리 완료 후 RedisKey 파기 및 토큰 발급
         consumerPhoneVerification(request.phoneNo());
 
-        log.info("[소셜 공통 가입] 유저 생성 완료, email: {}", email);
+        log.info("[소셜 공통 가입] DB 업데이트 대기 및 Redis 임시 저장 완료, email: {}", email);
 
         String tempToken = jwtUtil.createTempToken(email);
-
         return SocialSignupResponse.of(tempToken, email, request.nickname());
+    }
+
+    // 소셜 독자
+    private SignupResponse processSocialReaderSignup(ReaderSignupRequest request, String email, TempSocialSignupRequest tempRequest, String redisKey) {
+
+        User user = userRepository.findByEmail(email).orElseThrow(
+                ()-> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
+
+        user.updateForSocialSignup(
+                tempRequest.nickname()
+                , tempRequest.phoneNo()
+                , tempRequest.birthday()
+        );
+
+        user.changeRole(UserRole.READER);
+
+        SocialAuth socialAuth = SocialAuth.register(
+                tempRequest.providerSns()
+                , tempRequest.providerId()
+                , user.getId()
+        );
+
+        socialAuthRepository.save(socialAuth);
+
+        ReaderProfile readerProfile = ReaderProfile.register(
+                user.getId()
+                , request.mainGenreToString()
+                , request.readingGoal()
+        );
+
+        readerProfileRepository.save(readerProfile);
+
+        redisUtil.delete(redisKey);
+        return SignupResponse.of(user);
+    }
+
+    // 일반 독자
+    private SignupResponse processNormalReaderSignup(ReaderSignupRequest request, String email, TempSignupRequest tempRequest, String redisKey) {
+
+        // 중복 가입 체크
+        if(userRepository.existsByEmail(email)) {
+            throw new ServiceErrorException(UserExceptionEnum.ERR_ALREADY_COMPLETED_SIGNUP);
+        }
+
+        User user = User.register(
+                tempRequest.email(),
+                tempRequest.password(),
+                tempRequest.nickname(),
+                tempRequest.phoneNo(),
+                tempRequest.birthday(),
+                UserRole.READER
+        );
+        User savedUser = userRepository.save(user);
+
+        ReaderProfile readerProfile = ReaderProfile.register(
+                savedUser.getId()
+                , request.mainGenreToString()
+                , request.readingGoal()
+        );
+
+        readerProfileRepository.save(readerProfile);
+
+        redisUtil.delete(redisKey);
+        return SignupResponse.of(savedUser);
+    }
+
+    // 소셜 작가
+    private SignupResponse processSocialAuthorSignup(AuthorRequest request, String email, TempSocialSignupRequest tempRequest, String redisKey) {
+
+        User user = userRepository.findByEmail(email).orElseThrow(
+                ()-> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
+
+        user.updateForSocialSignup(
+                tempRequest.nickname()
+                , tempRequest.phoneNo()
+                , tempRequest.birthday()
+        );
+
+        user.changeRole(UserRole.AUTHOR);
+
+        SocialAuth socialAuth = SocialAuth.register(
+                tempRequest.providerSns()
+                , tempRequest.providerId()
+                , user.getId()
+        );
+
+        socialAuthRepository.save(socialAuth);
+
+        AuthorProfile authorProfile = AuthorProfile.register(
+                user.getId()
+                , request.bio()
+                , request.careerLevel()
+                , request.mainGenreToString()
+                , request.instagramLinks()
+                , request.xLinks()
+                , request.blogLinks()
+                , request.allowMenteeRequest()
+        );
+
+        authorProfileRepository.save(authorProfile);
+
+        redisUtil.delete(redisKey);
+        return SignupResponse.of(user);
+    }
+
+    // 일반 작가
+    private SignupResponse processNormalAuthorSignup(AuthorRequest request, String email, TempSignupRequest tempRequest, String redisKey) {
+
+        if(userRepository.existsByEmail(email)) {
+            throw new ServiceErrorException(UserExceptionEnum.ERR_ALREADY_COMPLETED_SIGNUP);
+        }
+
+        User user = User.register(
+                tempRequest.email()
+                , tempRequest.password()
+                , tempRequest.nickname()
+                , tempRequest.phoneNo()
+                , tempRequest.birthday()
+                , UserRole.AUTHOR
+        );
+
+        User savedUser = userRepository.save(user);
+
+        AuthorProfile authorProfile = AuthorProfile.register(
+                savedUser.getId()
+                , request.bio()
+                , request.careerLevel()
+                , request.mainGenreToString()
+                , request.instagramLinks()
+                , request.xLinks()
+                , request.blogLinks()
+                , request.allowMenteeRequest()
+        );
+
+        authorProfileRepository.save(authorProfile);
+
+        redisUtil.delete(redisKey);
+        return SignupResponse.of(savedUser);
     }
 
     /** ======== SMS 공통 메서드 ======== */

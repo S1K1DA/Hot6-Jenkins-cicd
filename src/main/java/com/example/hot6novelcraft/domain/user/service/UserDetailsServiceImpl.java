@@ -22,6 +22,6 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         User user = userRepository.findByEmail(email).orElseThrow(
                 () -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER)
         );
-        return new UserDetailsImpl(user);
+        return new UserDetailsImpl(user, null);
     }
 }

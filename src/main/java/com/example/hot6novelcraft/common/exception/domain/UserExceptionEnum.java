@@ -17,6 +17,7 @@ public enum UserExceptionEnum implements ErrorCode {
     , ERR_INVALID_NICKNAME(HttpStatus.BAD_REQUEST, "닉네임은 2~10자이내로 입력하세요")
     , ERR_INVALID_PASSWORD(HttpStatus.BAD_REQUEST, "비밀번호 형식이 올바르지 않습니다")
     , ERR_ALREADY_COMPLETED_SIGNUP(HttpStatus.CONFLICT, "이미 회원가입이 되어있습니다")
+    , ERR_ADDITIONAL_INFORMATION(HttpStatus.BAD_REQUEST, "추가 정보 입력이 필요합니다")
 
     // 휴대폰 인증
     , ERR_INVALID_PHONE_NO(HttpStatus.BAD_REQUEST, "휴대폰 번호형식이 올바르지 않습니다")

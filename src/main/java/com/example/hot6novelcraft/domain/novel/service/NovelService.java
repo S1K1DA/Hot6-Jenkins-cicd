@@ -192,7 +192,7 @@ public class NovelService {
      * 한 달 신작 리스트 (limit 50 작품)
      * 서하나
      **/
-    @Transactional
+    @Transactional(readOnly = true)
     public List<NovelListResponse> getNewNovelList(String genre, NovelStatus status, int limit) {
 
         String cacheKey = NOVEL_LIST_CACHE_KEY

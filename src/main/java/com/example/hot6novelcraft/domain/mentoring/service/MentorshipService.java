@@ -8,15 +8,23 @@ import com.example.hot6novelcraft.domain.file.service.FileUploadService;
 import com.example.hot6novelcraft.domain.mentor.entity.Mentor;
 import com.example.hot6novelcraft.domain.mentor.repository.MentorRepository;
 import com.example.hot6novelcraft.domain.mentoring.dto.request.MentorshipCreateRequest;
+import com.example.hot6novelcraft.domain.mentoring.dto.response.MentorWithNickname;
 import com.example.hot6novelcraft.domain.mentoring.dto.response.MentorshipCreateResponse;
+import com.example.hot6novelcraft.domain.mentoring.dto.response.MentorshipListResponse;
 import com.example.hot6novelcraft.domain.mentoring.entity.Mentorship;
 import com.example.hot6novelcraft.domain.mentoring.entity.enums.MentorshipStatus;
 import com.example.hot6novelcraft.domain.mentoring.repository.MentorshipRepository;
 import com.example.hot6novelcraft.domain.user.entity.User;
+import com.example.hot6novelcraft.domain.user.entity.enums.CareerLevel;
 import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import com.example.hot6novelcraft.domain.user.repository.UserRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,7 +41,9 @@ public class MentorshipService {
     private final UserRepository userRepository;
 
     private final FileUploadService fileUploadService;
+    private final ObjectMapper objectMapper;
 
+    // 멘토링 신청(멘티)
     @Transactional
     public MentorshipCreateResponse applyMentorship(Long menteeId, MentorshipCreateRequest request) {
 
@@ -82,11 +92,7 @@ public class MentorshipService {
         return MentorshipCreateResponse.from(saved.getId());
     }
 
-    /**
-     * 멘토링 원고 파일 업로드
-     * - 작가 권한만 업로드 가능
-     * 정은식
-     */
+    // 멘토링 원고 업로드
     public String uploadManuscript(MultipartFile file, Long menteeId) {
 
         // 작가 권한 확인
@@ -98,5 +104,35 @@ public class MentorshipService {
         }
 
         return fileUploadService.uploadManuscript(file);
+    }
+
+    // 멘토 목록 조회(멘티 시점) - 필터: 장르,등급
+    @Transactional(readOnly = true)
+    public Page<MentorshipListResponse> getMentorList(String genre, CareerLevel careerLevel, Pageable pageable) {
+
+        Page<MentorWithNickname> mentors = mentorshipRepository.findMentorList(genre, careerLevel, pageable);
+
+        return mentors.map(m -> MentorshipListResponse.of(
+                m.mentorId(),
+                m.nickname(),
+                m.careerLevel(),
+                fromJson(m.mainGenres()),
+                fromJson(m.specialFields()),
+                fromJson(m.mentoringStyle()),
+                m.awardsCareer(),
+                m.maxMentees()
+        ));
+    }
+
+    // JSON 문자열을 List<String>으로 변환
+    private List<String> fromJson(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {});
+        } catch (JsonProcessingException e) {
+            throw new ServiceErrorException(MentorExceptionEnum.MENTOR_JSON_SERIALIZE_FAILED);
+        }
     }
 }

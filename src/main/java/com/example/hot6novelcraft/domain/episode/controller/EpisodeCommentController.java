@@ -26,6 +26,7 @@ public class EpisodeCommentController {
 
     /**
      * 댓글 작성
+     * 정은식
      */
     @PostMapping("episodes/{episodeId}/comments")
     public ResponseEntity<BaseResponse<EpisodeCommentCreateResponse>> createComment(
@@ -42,6 +43,7 @@ public class EpisodeCommentController {
 
     /**
      * 댓글 삭제 (hard delete)
+     * 정은식
      */
     @DeleteMapping("/comments/{commentId}")
     public ResponseEntity<BaseResponse<Void>> deleteComment(
@@ -57,6 +59,7 @@ public class EpisodeCommentController {
 
     /**
      * 댓글 목록 조회
+     * 정은식
      */
     @GetMapping("/episodes/{episodeId}/comments")
     public ResponseEntity<BaseResponse<PageResponse<EpisodeCommentListResponse>>> getCommentList(

@@ -3,6 +3,7 @@ package com.example.hot6novelcraft.domain.mentoring.service;
 import com.example.hot6novelcraft.common.exception.ServiceErrorException;
 import com.example.hot6novelcraft.common.exception.domain.MentoringExceptionEnum;
 import com.example.hot6novelcraft.common.exception.domain.MentorExceptionEnum;
+import com.example.hot6novelcraft.domain.file.service.FileUploadService;
 import com.example.hot6novelcraft.domain.mentor.entity.Mentor;
 import com.example.hot6novelcraft.domain.mentor.entity.MentorFeedback;
 import com.example.hot6novelcraft.domain.mentor.repository.MentorFeedbackRepository;
@@ -37,6 +38,8 @@ public class MentoringService {
     private final UserRepository userRepository;
     private final NovelRepository novelRepository;
     private final MentorFeedbackRepository mentorFeedbackRepository;
+
+    private final FileUploadService fileUploadService;
 
     // =====================================================================
     // 공통 로직 (V1 / V2 동일)
@@ -102,7 +105,8 @@ public class MentoringService {
 
         mentorship.increaseManuscriptDownloadCount();
 
-        return mentorship.getManuscriptUrl();
+        // S3 Presigned URL 발급 (1시간 유효)
+        return fileUploadService.generateManuscriptPresignedUrl(mentorship.getManuscriptUrl());
     }
 
     @Transactional

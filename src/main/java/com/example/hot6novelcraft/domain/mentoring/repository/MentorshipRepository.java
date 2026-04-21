@@ -34,4 +34,8 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT m FROM Mentorship m WHERE m.id = :id")
     Optional<Mentorship> findByIdWithLock(@Param("id") Long id);
+
+    // 멘티가 이미 PENDING,ACCEPTED 멘토링 있는지 확인 (1:1 제약)
+    boolean existsByMenteeIdAndStatusIn(Long menteeId, List<MentorshipStatus> statuses);
+
 }

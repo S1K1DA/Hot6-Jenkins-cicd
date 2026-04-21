@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class MentorFeedbackV2 extends BaseEntity {
+public class MentorFeedback extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,8 +35,8 @@ public class MentorFeedbackV2 extends BaseEntity {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
-    private MentorFeedbackV2(Long mentorshipId, Long authorId, String title,
-                             int sessionNumber, String content) {
+    private MentorFeedback(Long mentorshipId, Long authorId, String title,
+                           int sessionNumber, String content) {
         this.mentorshipId  = mentorshipId;
         this.authorId      = authorId;
         this.title         = title;
@@ -44,8 +44,8 @@ public class MentorFeedbackV2 extends BaseEntity {
         this.content       = content;
     }
 
-    public static MentorFeedbackV2 create(Long mentorshipId, Long authorId, String title,
-                                          int sessionNumber, String content) {
-        return new MentorFeedbackV2(mentorshipId, authorId, title, sessionNumber, content);
+    public static MentorFeedback create(Long mentorshipId, Long authorId, String title,
+                                        int sessionNumber, String content) {
+        return new MentorFeedback(mentorshipId, authorId, title, sessionNumber, content);
     }
 }

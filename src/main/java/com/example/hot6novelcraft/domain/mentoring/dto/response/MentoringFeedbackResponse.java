@@ -1,6 +1,6 @@
 package com.example.hot6novelcraft.domain.mentoring.dto.response;
 
-import com.example.hot6novelcraft.domain.mentor.entity.MentorFeedbackV2;
+import com.example.hot6novelcraft.domain.mentor.entity.MentorFeedback;
 
 import java.time.LocalDateTime;
 
@@ -12,7 +12,7 @@ public record MentoringFeedbackResponse(
         String content,
         LocalDateTime createdAt
 ) {
-    public static MentoringFeedbackResponse from(MentorFeedbackV2 feedback) {
+    public static MentoringFeedbackResponse from(MentorFeedback feedback) {
         return new MentoringFeedbackResponse(
                 feedback.getId(),
                 feedback.getMentorshipId(),

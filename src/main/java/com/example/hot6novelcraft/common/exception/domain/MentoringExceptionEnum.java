@@ -16,7 +16,13 @@ public enum MentoringExceptionEnum implements ErrorCode {
     MENTORING_SLOT_FULL(HttpStatus.BAD_REQUEST, "멘토링 정원이 마감되었습니다"),
     MENTORING_MANUSCRIPT_NOT_FOUND(HttpStatus.NOT_FOUND, "첨부된 원고 파일을 찾을 수 없습니다"),
     MENTORING_NOT_ACCEPTED(HttpStatus.BAD_REQUEST, "진행 중인 멘토링만 종료할 수 있습니다"),
-    MENTORING_FEEDBACK_ONLY_ACCEPTED(HttpStatus.BAD_REQUEST, "진행 중인 멘토링에만 피드백을 작성할 수 있습니다");
+    MENTORING_FEEDBACK_ONLY_ACCEPTED(HttpStatus.BAD_REQUEST, "진행 중인 멘토링에만 피드백을 작성할 수 있습니다"),
+
+    MENTORING_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "이미 진행 중인 멘토링이 있습니다"),
+    MENTORING_SELF_APPLY(HttpStatus.BAD_REQUEST, "본인에게 멘토링을 신청할 수 없습니다"),
+    MENTORING_NOT_AUTHOR(HttpStatus.FORBIDDEN, "작가 권한이 필요합니다"),
+    MENTORING_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "완료된 멘토링만 평가할 수 있습니다"),
+    MENTORING_REVIEW_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "이미 평가한 멘토링입니다");
 
 
 

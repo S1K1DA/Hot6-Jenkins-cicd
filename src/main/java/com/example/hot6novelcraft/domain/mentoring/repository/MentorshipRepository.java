@@ -29,4 +29,8 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
                                 @Param("startOfMonth") LocalDateTime startOfMonth);
 
     List<Mentorship> findAllByMentorIdAndStatus(Long mentorId, MentorshipStatus status);
+
+    // 멘티가 이미 PENDING,ACCEPTED 멘토링 있는지 확인 (1:1 제약)
+    boolean existsByMenteeIdAndStatusIn(Long menteeId, List<MentorshipStatus> statuses);
+
 }

@@ -18,6 +18,7 @@ public class EpisodeLikeController {
 
     /**
      * 회차 좋아요 / 취소
+     * 정은식
      */
     @PostMapping("/{episodeId}/like")
     public ResponseEntity<BaseResponse<EpisodeLikeResponse>> toggleLike(

@@ -96,7 +96,7 @@ class MentorshipServiceTest {
             // save() 반환값 mock 추가!
             Mentorship savedMentorship = Mentorship.create(
                     MENTOR_USER_ID, MENTEE_ID, NOVEL_ID, "신청 동기입니다.",
-                    "https://s3.amazonaws.com/test.txt", null
+                    "https://s3.amazonaws.com/test.txt"
             );
             setField(savedMentorship, "id", 10L);
 

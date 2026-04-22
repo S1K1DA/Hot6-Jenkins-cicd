@@ -73,7 +73,7 @@ class EpisodePurchaseControllerTest {
         given(mockUser.getEmail()).willReturn("test@test.com");
 
         // UserDetailsImpl 실제 객체 생성
-        UserDetailsImpl userDetails = new UserDetailsImpl(mockUser);
+        UserDetailsImpl userDetails = new UserDetailsImpl(mockUser, null);
 
         // SecurityContext에 인증 정보 설정
         SecurityContextHolder.getContext().setAuthentication(

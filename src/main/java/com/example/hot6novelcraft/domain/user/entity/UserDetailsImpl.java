@@ -1,5 +1,6 @@
 package com.example.hot6novelcraft.domain.user.entity;
 
+import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -16,9 +17,12 @@ public class UserDetailsImpl implements UserDetails, OAuth2User {
     private final Map<String, Object> attributes;
 
     // 일반 로그인용 생성자
-    public UserDetailsImpl(User user) {
-        this.user = user;
-        this.attributes = Collections.emptyMap();
+    public static UserDetailsImpl fromTemp(String email, UserRole role) {
+        User tempUser = User.builder()
+                .email(email)
+                .role(role)
+                .build();
+        return new UserDetailsImpl(tempUser, null);
     }
 
     // 소셜 로그인용 생성자 - 구글에서 받은 정보 담김
@@ -41,8 +45,7 @@ public class UserDetailsImpl implements UserDetails, OAuth2User {
     // 구글에서 받은 속성 맵핑
     @Override
     public Map<String, Object> getAttributes() {
-        return attributes;
-    }
+        return attributes == null ? Collections.emptyMap() : attributes;    }
 
     // OAuth2User의 식별자 = 이메일로 통일
     @Override

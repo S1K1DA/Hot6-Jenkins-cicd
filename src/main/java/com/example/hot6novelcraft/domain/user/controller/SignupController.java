@@ -1,12 +1,10 @@
 package com.example.hot6novelcraft.domain.user.controller;
 
 import com.example.hot6novelcraft.common.dto.BaseResponse;
-import com.example.hot6novelcraft.common.security.RedisUtil;
 import com.example.hot6novelcraft.domain.user.dto.request.*;
 import com.example.hot6novelcraft.domain.user.dto.response.*;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import com.example.hot6novelcraft.domain.user.entity.enums.ProviderSns;
-import com.example.hot6novelcraft.domain.user.service.AuthService;
 import com.example.hot6novelcraft.domain.user.service.SignupService;
 import com.example.hot6novelcraft.domain.user.service.SmsService;
 import jakarta.validation.Valid;

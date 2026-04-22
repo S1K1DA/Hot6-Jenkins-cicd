@@ -77,6 +77,9 @@ public class SecurityConfig {
                         .requestMatchers(
                         "/api/auth/login"
                                 , "/api/auth/signup"
+                                , "/api/auth/signup/reader"
+                                , "/api/auth/signup/author"
+                                ,"/api/auth/social/signup/**"
                                 , "/api/auth/email/check"
                                 , "/api/auth/nickname/check"
                                 , "/api/auth/phone/send"

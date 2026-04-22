@@ -5,6 +5,7 @@ import com.example.hot6novelcraft.domain.payment.dto.request.WebhookRequest;
 import com.example.hot6novelcraft.domain.payment.entity.Payment;
 import com.example.hot6novelcraft.domain.payment.entity.enums.PaymentMethod;
 import com.example.hot6novelcraft.domain.payment.entity.enums.PaymentStatus;
+import com.example.hot6novelcraft.domain.subscription.service.SubscriptionTransactionService;
 import com.example.hot6novelcraft.domain.webhookevent.entity.WebhookEvent;
 import com.example.hot6novelcraft.domain.webhookevent.entity.WebhookEventType;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -45,6 +46,7 @@ import org.springframework.stereotype.Service;
 public class WebhookService {
 
     private final WebhookTransactionService webhookTransactionService;
+    private final SubscriptionTransactionService subscriptionTransactionService;
     private final PaymentClient paymentClient;
     private final ObjectMapper objectMapper;
     private final RedisUtil redisUtil;
@@ -114,19 +116,46 @@ public class WebhookService {
         if (portOnePayment instanceof PaidPayment paidPayment) {
             PaymentMethod resolvedMethod = PaymentMethod.from(paidPayment.getMethod());
 
+            // 구독 결제인지 확인 (paymentKey가 "subscription-"으로 시작)
+            boolean isSubscriptionPayment = isSubscriptionPayment(paymentId);
+
             // /confirm과 동일한 Lock 키로 상호 배제 — 하나만 포인트 충전 수행
-            String lockKey = "payment:confirm:lock:" + paymentId;
+            // ⚠️ 구독 결제는 subscriptionId 기반 Lock (SubscriptionService와 동일한 키 패턴)
+            String lockKey;
+            Long subscriptionId = null;
+
+            if (isSubscriptionPayment) {
+                subscriptionId = extractSubscriptionId(paymentId);
+                if (subscriptionId == null) {
+                    log.error("웹훅 구독 결제 처리 실패: subscriptionId 추출 불가 paymentId={}", paymentId);
+                    webhookTransactionService.markEventFailed(webhookEvent.getId(),
+                            "paymentKey 형식 오류로 subscriptionId 추출 실패");
+                    return;
+                }
+                lockKey = "subscription:complete:lock:" + subscriptionId;
+            } else {
+                lockKey = "payment:confirm:lock:" + paymentId;
+            }
+
             if (!redisUtil.acquireLock(lockKey)) {
                 // /confirm이 처리 중 — WebhookEvent를 PENDING으로 두어 포트원 재시도 시 재처리
-                log.warn("웹훅: Lock 획득 실패 (/confirm 처리 중) paymentId={} → 포트원이 재시도 예정", paymentId);
+                log.warn("웹훅: Lock 획득 실패 (처리 중) paymentId={} → 포트원이 재시도 예정", paymentId);
                 return;
             }
             try {
-                webhookTransactionService.completePendingPayment(webhookEvent.getId(), payment.getId(), resolvedMethod);
+                if (isSubscriptionPayment) {
+                    // 구독 결제 처리
+                    webhookTransactionService.completePendingSubscriptionPayment(
+                            webhookEvent.getId(), payment.getId(), resolvedMethod, subscriptionId);
+                    log.info("웹훅 구독 결제 보정 완료 paymentId={} subscriptionId={}", paymentId, subscriptionId);
+                } else {
+                    // 일반 결제 처리
+                    webhookTransactionService.completePendingPayment(webhookEvent.getId(), payment.getId(), resolvedMethod);
+                    log.info("웹훅 보정 처리 완료 (/confirm 누락) paymentId={}", paymentId);
+                }
             } finally {
                 redisUtil.releaseLock(lockKey);
             }
-            log.info("웹훅 보정 처리 완료 (/confirm 누락) paymentId={}", paymentId);
         } else if (portOnePayment instanceof FailedPayment) {
             // PortOne에서 결제 실패로 확인 → PENDING이면 FAILED로 전환 (포인트 변동 없음)
             webhookTransactionService.failPendingPayment(webhookEvent.getId(), payment.getId());
@@ -172,5 +201,28 @@ public class WebhookService {
         }
     }
 
+    /**
+     * paymentKey가 구독 결제인지 확인
+     * 구독 결제는 "subscription-{subscriptionId}-{UUID}" 형식
+     */
+    private boolean isSubscriptionPayment(String paymentKey) {
+        return paymentKey != null && paymentKey.startsWith("subscription-");
+    }
+
+    /**
+     * paymentKey에서 subscriptionId 추출
+     * 형식: "subscription-{subscriptionId}-{UUID}"
+     */
+    private Long extractSubscriptionId(String paymentKey) {
+        try {
+            String[] parts = paymentKey.split("-");
+            if (parts.length >= 2) {
+                return Long.parseLong(parts[1]);
+            }
+        } catch (NumberFormatException e) {
+            log.error("paymentKey에서 subscriptionId 추출 실패 paymentKey={}", paymentKey, e);
+        }
+        return null;
+    }
 
 }

@@ -2,6 +2,7 @@ package com.example.hot6novelcraft.domain.payment.service;
 
 import com.example.hot6novelcraft.common.exception.ServiceErrorException;
 import com.example.hot6novelcraft.common.exception.domain.PaymentExceptionEnum;
+import com.example.hot6novelcraft.common.exception.domain.SubscriptionExceptionEnum;
 import com.example.hot6novelcraft.domain.payment.entity.Payment;
 import com.example.hot6novelcraft.domain.payment.entity.enums.PaymentMethod;
 import com.example.hot6novelcraft.domain.payment.entity.enums.PaymentStatus;
@@ -10,6 +11,8 @@ import com.example.hot6novelcraft.domain.point.service.PointService;
 import com.example.hot6novelcraft.domain.purchases.entity.Purchase;
 import com.example.hot6novelcraft.domain.purchases.entity.enums.PurchaseType;
 import com.example.hot6novelcraft.domain.purchases.repository.PurchaseRepository;
+import com.example.hot6novelcraft.domain.subscription.entity.Subscription;
+import com.example.hot6novelcraft.domain.subscription.repository.SubscriptionRepository;
 import com.example.hot6novelcraft.domain.webhookevent.entity.WebhookEvent;
 import com.example.hot6novelcraft.domain.webhookevent.entity.WebhookEventStatus;
 import com.example.hot6novelcraft.domain.webhookevent.entity.WebhookEventType;
@@ -32,6 +35,7 @@ public class WebhookTransactionService {
     private final PaymentRepository paymentRepository;
     private final PurchaseRepository purchaseRepository;
     private final WebhookEventRepository webhookEventRepository;
+    private final SubscriptionRepository subscriptionRepository;
     private final PointService pointService;
 
     /**
@@ -132,5 +136,45 @@ public class WebhookTransactionService {
         );
         webhookEventRepository.findById(webhookEventId).ifPresent(WebhookEvent::complete);
         log.info("웹훅 보정 완료 (/confirm 누락) paymentDbId={} userId={}", paymentDbId, payment.getUserId());
+    }
+
+    /**
+     * [구독 결제 웹훅 보정] PENDING 상태인 구독 결제를 COMPLETED로 전환하고 포인트 충전 + Subscription 업데이트
+     * Redis Lock으로 중복 처리가 방지되므로 원자적 UPDATE 없이 직접 전환한다.
+     */
+    @Transactional
+    public void completePendingSubscriptionPayment(Long webhookEventId, Long paymentDbId, PaymentMethod method, Long subscriptionId) {
+        Payment payment = paymentRepository.findById(paymentDbId)
+                .orElseThrow(() -> new ServiceErrorException(PaymentExceptionEnum.ERR_PAYMENT_NOT_FOUND));
+
+        // 이미 처리된 경우 스킵
+        if (payment.getStatus() != PaymentStatus.PENDING) {
+            log.info("웹훅 구독 결제 보정 스킵 - 이미 처리됨 paymentDbId={} status={}", paymentDbId, payment.getStatus());
+            webhookEventRepository.findById(webhookEventId).ifPresent(WebhookEvent::complete);
+            return;
+        }
+
+        // 1. Payment COMPLETED 전환
+        payment.complete(method);
+
+        // 2. Purchase 저장 (구독 타입)
+        // ⚠️ 구독료는 포인트 충전이 아니라 프리미엄 혜택 구매
+        purchaseRepository.save(
+                Purchase.create(payment.getUserId(), PurchaseType.SUBSCRIPTION, payment.getAmount(), paymentDbId)
+        );
+
+        // 3. Subscription nextBillingAt 업데이트
+        if (subscriptionId != null) {
+            Subscription subscription = subscriptionRepository.findById(subscriptionId)
+                    .orElseThrow(() -> new ServiceErrorException(SubscriptionExceptionEnum.ERR_SUBSCRIPTION_NOT_FOUND));
+            subscription.updateAfterPayment(paymentDbId);
+            subscriptionRepository.save(subscription);
+            log.info("구독 정기 청구 완료 subscriptionId={} nextBillingAt={}", subscriptionId, subscription.getNextBillingAt());
+        }
+
+        // 4. WebhookEvent COMPLETE
+        webhookEventRepository.findById(webhookEventId).ifPresent(WebhookEvent::complete);
+        log.info("웹훅 구독 결제 보정 완료 paymentDbId={} subscriptionId={} userId={}",
+                paymentDbId, subscriptionId, payment.getUserId());
     }
 }

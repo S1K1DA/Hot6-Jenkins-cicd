@@ -56,6 +56,7 @@ public class JwtFilter extends OncePerRequestFilter {
                     , "/payment-test.html"
                     , "/social-login-test.html"
                     , "/chat-test.html"
+                    , "/subscription-test.html"
                     , "/api/webhooks/portone"
                     , "/favicon.ico"
                     , "/login"          // 구글이 에러 시 여기로 리다이렉트
@@ -72,6 +73,7 @@ public class JwtFilter extends OncePerRequestFilter {
                 || path.equals("/favicon.ico")
                 || path.equals("/social-login-test.html")
                 || path.equals("/chat-test.html")
+                || path.equals("/subscription-test.html")
                 || path.equals("/error");
     }
 

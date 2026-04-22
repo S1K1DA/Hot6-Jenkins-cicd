@@ -8,15 +8,21 @@ import com.example.hot6novelcraft.domain.file.service.FileUploadService;
 import com.example.hot6novelcraft.domain.mentor.entity.Mentor;
 import com.example.hot6novelcraft.domain.mentor.repository.MentorRepository;
 import com.example.hot6novelcraft.domain.mentoring.dto.request.MentorshipCreateRequest;
-import com.example.hot6novelcraft.domain.mentoring.dto.response.MentorshipCreateResponse;
+import com.example.hot6novelcraft.domain.mentoring.dto.response.*;
 import com.example.hot6novelcraft.domain.mentoring.entity.Mentorship;
 import com.example.hot6novelcraft.domain.mentoring.entity.enums.MentorshipStatus;
 import com.example.hot6novelcraft.domain.mentoring.repository.MentorshipRepository;
 import com.example.hot6novelcraft.domain.user.entity.User;
+import com.example.hot6novelcraft.domain.user.entity.enums.CareerLevel;
 import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
 import com.example.hot6novelcraft.domain.user.repository.UserRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,7 +39,9 @@ public class MentorshipService {
     private final UserRepository userRepository;
 
     private final FileUploadService fileUploadService;
+    private final ObjectMapper objectMapper;
 
+    // 멘토링 신청(멘티)
     @Transactional
     public MentorshipCreateResponse applyMentorship(Long menteeId, MentorshipCreateRequest request) {
 
@@ -82,21 +90,109 @@ public class MentorshipService {
         return MentorshipCreateResponse.from(saved.getId());
     }
 
-    /**
-     * 멘토링 원고 파일 업로드
-     * - 작가 권한만 업로드 가능
-     * 정은식
-     */
+    // 멘토링 원고 업로드
     public String uploadManuscript(MultipartFile file, Long menteeId) {
 
         // 작가 권한 확인
         User mentee = userRepository.findById(menteeId)
-                .orElseThrow(() -> new ServiceErrorException(MentoringExceptionEnum.MENTORING_NOT_FOUND));
+                .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
 
         if (mentee.getRole() != UserRole.AUTHOR) {
             throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_NOT_AUTHOR);
         }
 
         return fileUploadService.uploadManuscript(file);
+    }
+
+    // 멘토 목록 조회(멘티 시점) - 필터: 장르,등급
+    @Transactional(readOnly = true)
+    public Page<MentorshipListResponse> getMentorList(String genre, CareerLevel careerLevel, Pageable pageable) {
+
+        Page<MentorWithNickname> mentors = mentorshipRepository.findMentorList(genre, careerLevel, pageable);
+
+        return mentors.map(m -> MentorshipListResponse.of(
+                m.mentorId(),
+                m.nickname(),
+                m.careerLevel(),
+                fromJson(m.mainGenres()),
+                fromJson(m.specialFields()),
+                fromJson(m.mentoringStyle()),
+                m.awardsCareer(),
+                m.maxMentees()
+        ));
+    }
+
+    // 멘토 상세 조회(멘티 시점)
+    @Transactional(readOnly = true)
+    public MentorshipDetailResponse getMentorDetail(Long mentorId) {
+
+        Mentor mentor = mentorRepository.findById(mentorId)
+                .orElseThrow(() -> new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
+
+        String nickname = userRepository.findById(mentor.getUserId())
+                .map(User::getNickname)
+                .orElse("알 수 없는 사용자");
+
+        return MentorshipDetailResponse.of(
+                mentor.getId(),
+                nickname,
+                mentor.getCareerLevel(),
+                fromJson(mentor.getMainGenres()),
+                fromJson(mentor.getSpecialFields()),
+                fromJson(mentor.getMentoringStyle()),
+                mentor.getAwardsCareer(),
+                mentor.getBio(),
+                mentor.getMaxMentees()
+        );
+    }
+
+    // 내 멘토링 조회(멘티 시점)
+    @Transactional(readOnly = true)
+    public List<MentorshipHistoryResponse> getMyHistory(Long menteeId, MentorshipStatus status) {
+
+        // 작가 권한 확인
+        User mentee = userRepository.findById(menteeId)
+                .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
+
+        if (mentee.getRole() != UserRole.AUTHOR) {
+            throw new ServiceErrorException(MentoringExceptionEnum.MENTORING_NOT_AUTHOR);
+        }
+
+        // 상태 필터 여부에 따라 조회
+        List<Mentorship> mentorships;
+        if (status != null) {
+            mentorships = mentorshipRepository.findAllByMenteeIdAndStatusOrderByCreatedAtDesc(menteeId, status);
+        } else {
+            mentorships = mentorshipRepository.findAllByMenteeIdOrderByCreatedAtDesc(menteeId);
+        }
+
+        // Mentorship -> DTO 변환
+        return mentorships.stream()
+                .map(m -> {
+                    String mentorNickname = mentorRepository.findById(m.getMentorId())
+                            .flatMap(mentor -> userRepository.findById(mentor.getUserId()))
+                            .map(User::getNickname)
+                            .orElse("알 수 없는 멘토");
+
+                    return new MentorshipHistoryResponse(
+                            m.getId(),
+                            mentorNickname,
+                            m.getStatus(),
+                            m.getCreatedAt()
+                    );
+                })
+                .toList();
+    }
+
+    // JSON 문자열을 List<String>으로 변환
+    private List<String> fromJson(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {});
+        } catch (JsonProcessingException e) {
+            throw new ServiceErrorException(MentorExceptionEnum.MENTOR_JSON_SERIALIZE_FAILED);
+        }
     }
 }

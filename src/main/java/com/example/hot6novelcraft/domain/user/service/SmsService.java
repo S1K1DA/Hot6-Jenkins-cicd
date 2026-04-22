@@ -57,7 +57,7 @@ public class SmsService {
         Long requestCount = redisUtil.incrementAndExpire(limitKey, 1440);
 
         if(requestCount != null && requestCount > 5) {
-            log.warn("[SMS] 일일 전송 횟수 3회 초과, 수신번호: {}", phoneNumber);
+            log.warn("[SMS] 일일 전송 횟수 5회 초과, 수신번호: {}", phoneNumber);
             throw new ServiceErrorException(UserExceptionEnum.ERR_EXCEED_SMS_LIMIT);
         }
 

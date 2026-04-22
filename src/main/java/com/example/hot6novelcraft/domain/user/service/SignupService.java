@@ -128,15 +128,17 @@ public class SignupService {
         TempSocialSignupRequest tempSocialSignupRequest = (TempSocialSignupRequest) redisUtil.get(socialKey);
 
         if (tempSocialSignupRequest != null) {
+            redisUtil.delete(socialKey);
             return processSocialReaderSignup(request, email, tempSocialSignupRequest, socialKey);
         }
 
         // 소셜 가입자가 없다면 "일반 회원 가입" 사용자가 있는지 확인
-        String redisKey = "TEMP_SIGNUP:" + email;
-        TempSignupRequest tempRequest = (TempSignupRequest) redisUtil.get(redisKey);
+        String normalKey = "TEMP_SIGNUP:" + email;
+        TempSignupRequest tempRequest = (TempSignupRequest) redisUtil.get(normalKey);
 
         if (tempRequest != null) {
-            return processNormalReaderSignup(request, email, tempRequest, redisKey);
+            redisUtil.delete(normalKey);
+            return processNormalReaderSignup(request, email, tempRequest, normalKey);
         }
 
         // 둘 다 없으면 예외 처리
@@ -151,6 +153,7 @@ public class SignupService {
         TempSocialSignupRequest tempSocialSignupRequest = (TempSocialSignupRequest) redisUtil.get(socialKey);
 
         if(tempSocialSignupRequest != null) {
+            redisUtil.delete(socialKey);
             return processSocialAuthorSignup(request, email, tempSocialSignupRequest, socialKey);
         }
 
@@ -159,6 +162,7 @@ public class SignupService {
         TempSignupRequest tempRequest = (TempSignupRequest) redisUtil.get(normalKey);
 
         if(tempRequest != null) {
+            redisUtil.delete(normalKey);
             return processNormalAuthorSignup(request, email, tempRequest, normalKey);
         }
 

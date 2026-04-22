@@ -64,7 +64,7 @@ class MentoringControllerTest {
             throw new RuntimeException(e);
         }
 
-        userDetails = new UserDetailsImpl(user);
+        userDetails = new UserDetailsImpl(user, null);
     }
 
     // ===================== getReceivedMentorings 테스트 =====================

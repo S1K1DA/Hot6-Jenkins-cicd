@@ -80,7 +80,7 @@ class LibraryControllerTest {
         given(mockUser.getEmail()).willReturn("test@test.com");
 
         // mock(UserDetailsImpl.class) 대신 실제 객체 생성
-        UserDetailsImpl realUserDetails = new UserDetailsImpl(mockUser);
+        UserDetailsImpl realUserDetails = new UserDetailsImpl(mockUser, null);
 
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(

@@ -102,6 +102,6 @@ public class searchServiceIntegrationTest {
         ReflectionTestUtils.setField(dummyUser, "id", userId);
 
         // 3. UserDetailsImpl 로 감싸서 반환
-        return new UserDetailsImpl(dummyUser);
+        return new UserDetailsImpl(dummyUser, null);
     }
 }

@@ -64,7 +64,7 @@ class MentorControllerTest {
             throw new RuntimeException(e);
         }
 
-        userDetails = new UserDetailsImpl(user);
+        userDetails = new UserDetailsImpl(user, null);
     }
 
     // ===================== register 테스트 =====================

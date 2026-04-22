@@ -73,7 +73,7 @@ class NationalLibraryControllerTest {
         given(mockUser.getPassword()).willReturn("password");
         given(mockUser.getEmail()).willReturn("test@test.com");
 
-        UserDetailsImpl realUserDetails = new UserDetailsImpl(mockUser);
+        UserDetailsImpl realUserDetails = new UserDetailsImpl(mockUser, null);
 
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(

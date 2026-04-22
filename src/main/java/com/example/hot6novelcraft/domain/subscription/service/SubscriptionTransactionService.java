@@ -171,4 +171,18 @@ public class SubscriptionTransactionService {
     public Optional<Subscription> getActiveSubscription(Long userId) {
         return subscriptionRepository.findByUserIdAndSubscriptionStatus(userId, SubscriptionStatus.ACTIVE);
     }
+
+    /**
+     * Lock 획득 후 Subscription이 여전히 PENDING 상태인지 재검증
+     * (Lock 획득 전~후 사이에 상태가 변경되었을 가능성 방어)
+     */
+    @Transactional(readOnly = true)
+    public void validateSubscriptionStillPending(Long subscriptionId) {
+        Subscription subscription = subscriptionRepository.findById(subscriptionId)
+                .orElseThrow(() -> new ServiceErrorException(SubscriptionExceptionEnum.ERR_SUBSCRIPTION_NOT_FOUND));
+
+        if (subscription.getSubscriptionStatus() != SubscriptionStatus.PENDING) {
+            throw new ServiceErrorException(SubscriptionExceptionEnum.ERR_INVALID_SUBSCRIPTION_STATUS);
+        }
+    }
 }

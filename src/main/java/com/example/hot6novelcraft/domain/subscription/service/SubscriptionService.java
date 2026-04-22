@@ -9,6 +9,8 @@ import com.example.hot6novelcraft.domain.subscription.dto.request.SubscriptionPr
 import com.example.hot6novelcraft.domain.subscription.dto.response.SubscriptionPrepareResponse;
 import com.example.hot6novelcraft.domain.subscription.dto.response.SubscriptionResponse;
 import com.example.hot6novelcraft.domain.subscription.entity.Subscription;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.portone.sdk.server.errors.*;
 import io.portone.sdk.server.payment.PaymentClient;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,7 @@ public class SubscriptionService {
     private final PaymentClient paymentClient;
     private final RedisUtil redisUtil;
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
     @Value("${portone.api-secret}")
     private String portoneApiSecret;
@@ -85,6 +88,10 @@ public class SubscriptionService {
         }
 
         try {
+            // 🔒 Lock 획득 후 상태 재검증 (방어적 프로그래밍)
+            // Lock 획득 전~후 사이에 다른 요청이 이미 처리했을 가능성 방어
+            subscriptionTransactionService.validateSubscriptionStillPending(subscription.getId());
+
             // 2. 빌링키로 첫 결제 실행
             // paymentKey에 subscriptionId 포함 (웹훅에서 구독 결제 구분용)
             String paymentKey = "subscription-" + subscription.getId() + "-" + UUID.randomUUID();
@@ -159,7 +166,21 @@ public class SubscriptionService {
             );
 
             if (response.getStatusCode() == HttpStatus.OK) {
-                log.info("[빌링키 결제 성공] paymentKey={}", paymentKey);
+                // 🔍 응답 바디 파싱 및 PortOne 상태 코드 검증
+                String responseBody = response.getBody();
+                JsonNode jsonResponse = objectMapper.readTree(responseBody);
+                String paymentStatus = jsonResponse.path("status").asText();
+
+                // PortOne Payment 상태 검증 (PAID만 성공으로 처리)
+                if (!"PAID".equals(paymentStatus)) {
+                    String failureReason = jsonResponse.path("failure").path("reason").asText("알 수 없음");
+                    String pgMessage = jsonResponse.path("failure").path("pgMessage").asText("");
+                    log.error("[빌링키 결제 실패] PortOne 상태={}, 사유={}, PG메시지={}, paymentKey={}",
+                            paymentStatus, failureReason, pgMessage, paymentKey);
+                    throw new ServiceErrorException(SubscriptionExceptionEnum.ERR_PORTONE_API_ERROR);
+                }
+
+                log.info("[빌링키 결제 성공] paymentKey={}, status={}", paymentKey, paymentStatus);
 
                 // Payment와 Purchase를 단일 트랜잭션으로 생성 (원자성 보장)
                 var payment = subscriptionTransactionService.createPaymentAndPurchase(userId, paymentKey, amount);
@@ -169,7 +190,7 @@ public class SubscriptionService {
 
                 return payment.getId();
             } else {
-                log.error("[빌링키 결제 실패] 예상치 못한 응답 paymentKey={}, status={}",
+                log.error("[빌링키 결제 실패] 예상치 못한 HTTP 상태 paymentKey={}, status={}",
                         paymentKey, response.getStatusCode());
                 throw new ServiceErrorException(SubscriptionExceptionEnum.ERR_PORTONE_API_ERROR);
             }

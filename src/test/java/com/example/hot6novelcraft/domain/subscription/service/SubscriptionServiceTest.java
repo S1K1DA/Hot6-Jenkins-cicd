@@ -57,6 +57,9 @@ class SubscriptionServiceTest {
     @Mock
     private RestTemplate restTemplate;
 
+    @Mock
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
     private static final Long USER_ID = 1L;
     private static final Long SUBSCRIPTION_ID = 100L;
     private static final Long PAYMENT_ID = 200L;
@@ -149,7 +152,7 @@ class SubscriptionServiceTest {
 
         @Test
         @DisplayName("성공 - 빌링키로 첫 결제 + 구독 활성화")
-        void completeSubscription_success() {
+        void completeSubscription_success() throws Exception {
             // given
             ReflectionTestUtils.setField(subscriptionService, "portoneApiSecret", PORTONE_API_SECRET);
 
@@ -162,8 +165,17 @@ class SubscriptionServiceTest {
             given(redisUtil.acquireLock(anyString())).willReturn(true);
             given(subscriptionTransactionService.getSubscriptionForComplete(USER_ID, SUBSCRIPTION_KEY))
                     .willReturn(pendingSubscription);
+            doNothing().when(subscriptionTransactionService).validateSubscriptionStillPending(SUBSCRIPTION_ID);
+            // PortOne 빌링키 결제 성공 응답 (status: PAID)
+            String portoneSuccessResponse = "{\"status\":\"PAID\",\"id\":\"payment-id\"}";
             given(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
-                    .willReturn(ResponseEntity.ok("{}"));
+                    .willReturn(ResponseEntity.ok(portoneSuccessResponse));
+            // ObjectMapper mock 설정 (JSON 파싱)
+            com.fasterxml.jackson.databind.JsonNode mockJsonNode = mock(com.fasterxml.jackson.databind.JsonNode.class);
+            com.fasterxml.jackson.databind.JsonNode mockStatusNode = mock(com.fasterxml.jackson.databind.JsonNode.class);
+            given(objectMapper.readTree(portoneSuccessResponse)).willReturn(mockJsonNode);
+            given(mockJsonNode.path("status")).willReturn(mockStatusNode);
+            given(mockStatusNode.asText()).willReturn("PAID");
             given(subscriptionTransactionService.createPaymentAndPurchase(eq(USER_ID), anyString(), eq(AMOUNT)))
                     .willReturn(payment);
             given(subscriptionTransactionService.completeSubscription(SUBSCRIPTION_KEY, BILLING_KEY, PAYMENT_ID))
@@ -370,7 +382,7 @@ class SubscriptionServiceTest {
 
         @Test
         @DisplayName("성공 - 정기 청구 성공")
-        void processBillingForSubscription_success() {
+        void processBillingForSubscription_success() throws Exception {
             // given
             ReflectionTestUtils.setField(subscriptionService, "portoneApiSecret", PORTONE_API_SECRET);
 
@@ -378,8 +390,16 @@ class SubscriptionServiceTest {
             Payment payment = createMockPayment(PAYMENT_ID, USER_ID, AMOUNT);
 
             given(redisUtil.acquireLock(anyString())).willReturn(true);
+            // PortOne 빌링키 결제 성공 응답 (status: PAID)
+            String portoneSuccessResponse = "{\"status\":\"PAID\",\"id\":\"payment-id\"}";
             given(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
-                    .willReturn(ResponseEntity.ok("{}"));
+                    .willReturn(ResponseEntity.ok(portoneSuccessResponse));
+            // ObjectMapper mock 설정 (JSON 파싱)
+            com.fasterxml.jackson.databind.JsonNode mockJsonNode = mock(com.fasterxml.jackson.databind.JsonNode.class);
+            com.fasterxml.jackson.databind.JsonNode mockStatusNode = mock(com.fasterxml.jackson.databind.JsonNode.class);
+            given(objectMapper.readTree(portoneSuccessResponse)).willReturn(mockJsonNode);
+            given(mockJsonNode.path("status")).willReturn(mockStatusNode);
+            given(mockStatusNode.asText()).willReturn("PAID");
             given(subscriptionTransactionService.createPaymentAndPurchase(eq(USER_ID), anyString(), eq(AMOUNT)))
                     .willReturn(payment);
             doNothing().when(subscriptionTransactionService)

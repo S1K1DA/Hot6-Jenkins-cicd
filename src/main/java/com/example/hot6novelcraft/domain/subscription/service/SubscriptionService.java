@@ -42,10 +42,14 @@ public class SubscriptionService {
         // 1. 중복 구독 체크
         subscriptionTransactionService.validateNotSubscribed(userId);
 
-        // 2. subscriptionKey 생성 (이니시스 V2 issueId 40자 제한 고려 → UUID만 사용, 36자)
+        // 2. 금액 검증 (클라이언트 금액 vs 플랜 정가)
+        request.planType().validateAmount(request.amount());
+        log.info("[구독 준비] 금액 검증 통과 planType={} amount={}", request.planType(), request.amount());
+
+        // 3. subscriptionKey 생성 (이니시스 V2 issueId 40자 제한 고려 → UUID만 사용, 36자)
         String subscriptionKey = UUID.randomUUID().toString();
 
-        // 3. PENDING Subscription 생성
+        // 4. PENDING Subscription 생성
         Subscription subscription = subscriptionTransactionService.prepareSubscription(
                 userId,
                 request.planType(),
@@ -66,7 +70,14 @@ public class SubscriptionService {
      * 구독 완료 - 빌링키로 첫 결제 + 구독 활성화
      */
     public SubscriptionResponse completeSubscription(Long userId, SubscriptionCompleteRequest request) {
-        String lockKey = "subscription:complete:lock:" + request.subscriptionKey();
+        // 1. PENDING Subscription 조회 + 검증 (Lock 전에 먼저 조회하여 subscriptionId 확보)
+        Subscription subscription = subscriptionTransactionService.getSubscriptionForComplete(
+                userId,
+                request.subscriptionKey()
+        );
+
+        // ⚠️ subscriptionId 기반 Lock (WebhookService와 동일한 키 패턴)
+        String lockKey = "subscription:complete:lock:" + subscription.getId();
 
         // Redis Lock 획득
         if (!redisUtil.acquireLock(lockKey)) {
@@ -74,12 +85,6 @@ public class SubscriptionService {
         }
 
         try {
-            // 1. PENDING Subscription 조회 + 검증
-            Subscription subscription = subscriptionTransactionService.getSubscriptionForComplete(
-                    userId,
-                    request.subscriptionKey()
-            );
-
             // 2. 빌링키로 첫 결제 실행
             // paymentKey에 subscriptionId 포함 (웹훅에서 구독 결제 구분용)
             String paymentKey = "subscription-" + subscription.getId() + "-" + UUID.randomUUID();
@@ -156,11 +161,8 @@ public class SubscriptionService {
             if (response.getStatusCode() == HttpStatus.OK) {
                 log.info("[빌링키 결제 성공] paymentKey={}", paymentKey);
 
-                // Payment 생성 (결제 이력)
-                var payment = subscriptionTransactionService.createPayment(userId, paymentKey, amount);
-
-                // Purchase 저장 (구독 구매 이력)
-                subscriptionTransactionService.createPurchase(userId, amount, payment.getId());
+                // Payment와 Purchase를 단일 트랜잭션으로 생성 (원자성 보장)
+                var payment = subscriptionTransactionService.createPaymentAndPurchase(userId, paymentKey, amount);
 
                 // ⚠️ 주의: 구독료는 포인트 충전이 아니라 프리미엄 혜택 구매
                 // 포인트 충전은 일반 결제에서만 수행

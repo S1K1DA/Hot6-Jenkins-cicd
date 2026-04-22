@@ -164,9 +164,8 @@ class SubscriptionServiceTest {
                     .willReturn(pendingSubscription);
             given(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
                     .willReturn(ResponseEntity.ok("{}"));
-            given(subscriptionTransactionService.createPayment(eq(USER_ID), anyString(), eq(AMOUNT)))
+            given(subscriptionTransactionService.createPaymentAndPurchase(eq(USER_ID), anyString(), eq(AMOUNT)))
                     .willReturn(payment);
-            doNothing().when(subscriptionTransactionService).createPurchase(USER_ID, AMOUNT, PAYMENT_ID);
             given(subscriptionTransactionService.completeSubscription(SUBSCRIPTION_KEY, BILLING_KEY, PAYMENT_ID))
                     .willReturn(activeSubscription);
 
@@ -186,9 +185,7 @@ class SubscriptionServiceTest {
             verify(restTemplate, times(1))
                     .exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class));
             verify(subscriptionTransactionService, times(1))
-                    .createPayment(eq(USER_ID), anyString(), eq(AMOUNT));
-            verify(subscriptionTransactionService, times(1))
-                    .createPurchase(USER_ID, AMOUNT, PAYMENT_ID);
+                    .createPaymentAndPurchase(eq(USER_ID), anyString(), eq(AMOUNT));
             verify(subscriptionTransactionService, times(1))
                     .completeSubscription(SUBSCRIPTION_KEY, BILLING_KEY, PAYMENT_ID);
         }
@@ -198,7 +195,11 @@ class SubscriptionServiceTest {
         void completeSubscription_lockAcquireFailed_fail() {
             // given
             SubscriptionCompleteRequest request = new SubscriptionCompleteRequest(SUBSCRIPTION_KEY, BILLING_KEY);
+            Subscription pendingSubscription = createMockSubscription(SUBSCRIPTION_ID, USER_ID, SubscriptionStatus.PENDING, SUBSCRIPTION_KEY, null);
 
+            // Lock 전에 subscription 조회가 먼저 일어남
+            given(subscriptionTransactionService.getSubscriptionForComplete(USER_ID, SUBSCRIPTION_KEY))
+                    .willReturn(pendingSubscription);
             given(redisUtil.acquireLock(anyString())).willReturn(false);
 
             // when & then
@@ -206,8 +207,9 @@ class SubscriptionServiceTest {
                     .isInstanceOf(ServiceErrorException.class)
                     .hasMessageContaining(SubscriptionExceptionEnum.ERR_SUBSCRIPTION_PROCESSING.getMessage());
 
+            verify(subscriptionTransactionService, times(1)).getSubscriptionForComplete(USER_ID, SUBSCRIPTION_KEY);
             verify(redisUtil, times(1)).acquireLock(anyString());
-            verify(subscriptionTransactionService, never()).getSubscriptionForComplete(anyLong(), anyString());
+            verify(redisUtil, never()).releaseLock(anyString());
         }
 
         @Test
@@ -378,9 +380,8 @@ class SubscriptionServiceTest {
             given(redisUtil.acquireLock(anyString())).willReturn(true);
             given(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
                     .willReturn(ResponseEntity.ok("{}"));
-            given(subscriptionTransactionService.createPayment(eq(USER_ID), anyString(), eq(AMOUNT)))
+            given(subscriptionTransactionService.createPaymentAndPurchase(eq(USER_ID), anyString(), eq(AMOUNT)))
                     .willReturn(payment);
-            doNothing().when(subscriptionTransactionService).createPurchase(USER_ID, AMOUNT, PAYMENT_ID);
             doNothing().when(subscriptionTransactionService)
                     .updateSubscriptionAfterPayment(BILLING_KEY, PAYMENT_ID);
 
@@ -393,9 +394,7 @@ class SubscriptionServiceTest {
             verify(restTemplate, times(1))
                     .exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class));
             verify(subscriptionTransactionService, times(1))
-                    .createPayment(eq(USER_ID), anyString(), eq(AMOUNT));
-            verify(subscriptionTransactionService, times(1))
-                    .createPurchase(USER_ID, AMOUNT, PAYMENT_ID);
+                    .createPaymentAndPurchase(eq(USER_ID), anyString(), eq(AMOUNT));
             verify(subscriptionTransactionService, times(1))
                     .updateSubscriptionAfterPayment(BILLING_KEY, PAYMENT_ID);
         }
@@ -437,7 +436,7 @@ class SubscriptionServiceTest {
             // then
             verify(redisUtil, times(1)).acquireLock(anyString());
             verify(restTemplate, never()).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class));
-            verify(subscriptionTransactionService, never()).createPayment(anyLong(), anyString(), anyLong());
+            verify(subscriptionTransactionService, never()).createPaymentAndPurchase(anyLong(), anyString(), anyLong());
         }
     }
 }

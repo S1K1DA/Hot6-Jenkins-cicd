@@ -120,9 +120,22 @@ public class WebhookService {
             boolean isSubscriptionPayment = isSubscriptionPayment(paymentId);
 
             // /confirm과 동일한 Lock 키로 상호 배제 — 하나만 포인트 충전 수행
-            String lockKey = isSubscriptionPayment
-                    ? "subscription:complete:lock:" + paymentId
-                    : "payment:confirm:lock:" + paymentId;
+            // ⚠️ 구독 결제는 subscriptionId 기반 Lock (SubscriptionService와 동일한 키 패턴)
+            String lockKey;
+            Long subscriptionId = null;
+
+            if (isSubscriptionPayment) {
+                subscriptionId = extractSubscriptionId(paymentId);
+                if (subscriptionId == null) {
+                    log.error("웹훅 구독 결제 처리 실패: subscriptionId 추출 불가 paymentId={}", paymentId);
+                    webhookTransactionService.markEventFailed(webhookEvent.getId(),
+                            "paymentKey 형식 오류로 subscriptionId 추출 실패");
+                    return;
+                }
+                lockKey = "subscription:complete:lock:" + subscriptionId;
+            } else {
+                lockKey = "payment:confirm:lock:" + paymentId;
+            }
 
             if (!redisUtil.acquireLock(lockKey)) {
                 // /confirm이 처리 중 — WebhookEvent를 PENDING으로 두어 포트원 재시도 시 재처리
@@ -132,7 +145,6 @@ public class WebhookService {
             try {
                 if (isSubscriptionPayment) {
                     // 구독 결제 처리
-                    Long subscriptionId = extractSubscriptionId(paymentId);
                     webhookTransactionService.completePendingSubscriptionPayment(
                             webhookEvent.getId(), payment.getId(), resolvedMethod, subscriptionId);
                     log.info("웹훅 구독 결제 보정 완료 paymentId={} subscriptionId={}", paymentId, subscriptionId);

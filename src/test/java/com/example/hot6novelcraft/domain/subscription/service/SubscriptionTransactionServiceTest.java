@@ -301,6 +301,36 @@ class SubscriptionTransactionServiceTest {
     }
 
     // =========================================================
+    // createPaymentAndPurchase() - Payment와 Purchase를 단일 트랜잭션으로 생성
+    // =========================================================
+    @Nested
+    @DisplayName("createPaymentAndPurchase() - Payment와 Purchase 통합 생성")
+    class CreatePaymentAndPurchaseTest {
+
+        @Test
+        @DisplayName("성공 - Payment와 Purchase가 단일 트랜잭션으로 생성됨")
+        void createPaymentAndPurchase_success() {
+            // given
+            Payment mockPayment = createMockPayment(PAYMENT_ID, USER_ID, PaymentStatus.COMPLETED);
+            given(paymentRepository.save(any(Payment.class))).willReturn(mockPayment);
+            given(purchaseRepository.save(any(Purchase.class))).willReturn(mock(Purchase.class));
+
+            // when
+            Payment result = transactionService.createPaymentAndPurchase(USER_ID, PAYMENT_KEY, AMOUNT);
+
+            // then
+            assertThat(result).isNotNull();
+            assertThat(result.getId()).isEqualTo(PAYMENT_ID);
+            assertThat(result.getUserId()).isEqualTo(USER_ID);
+            assertThat(result.getAmount()).isEqualTo(AMOUNT);
+
+            // Payment와 Purchase 모두 저장되었는지 검증
+            verify(paymentRepository, times(1)).save(any(Payment.class));
+            verify(purchaseRepository, times(1)).save(any(Purchase.class));
+        }
+    }
+
+    // =========================================================
     // getSubscriptionForCancel() - 구독 취소용 조회
     // =========================================================
     @Nested

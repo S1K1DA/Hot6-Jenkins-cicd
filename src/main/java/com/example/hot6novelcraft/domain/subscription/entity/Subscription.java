@@ -5,7 +5,6 @@ import com.example.hot6novelcraft.domain.subscription.entity.enums.PlanType;
 import com.example.hot6novelcraft.domain.subscription.entity.enums.SubscriptionStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -52,7 +51,6 @@ public class Subscription extends BaseEntity {
     private LocalDateTime nextBillingAt;
 
     // PENDING 상태로 준비
-    @Builder
     public static Subscription prepare(Long userId, PlanType planType, String subscriptionKey, Long amount) {
         Subscription subscription = new Subscription();
         subscription.userId = userId;
@@ -80,7 +78,12 @@ public class Subscription extends BaseEntity {
     }
 
     // 정기 결제 후 업데이트
+    // 멱등성 보장: 같은 paymentId면 스킵 (웹훅 재전송 대응)
     public void updateAfterPayment(Long paymentId) {
+        if (this.lastPaymentId != null && this.lastPaymentId.equals(paymentId)) {
+            // 이미 처리된 결제 - 웹훅 재전송이므로 스킵
+            return;
+        }
         this.lastPaymentId = paymentId;
         this.nextBillingAt = LocalDateTime.now().plusMonths(1);
     }

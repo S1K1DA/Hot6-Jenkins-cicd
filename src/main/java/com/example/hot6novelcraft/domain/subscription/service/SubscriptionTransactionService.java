@@ -32,10 +32,19 @@ public class SubscriptionTransactionService {
 
     @Transactional(readOnly = true)
     public void validateNotSubscribed(Long userId) {
+        // ACTIVE 구독 체크
         Optional<Subscription> activeSubscription = subscriptionRepository
                 .findByUserIdAndSubscriptionStatus(userId, SubscriptionStatus.ACTIVE);
 
         if (activeSubscription.isPresent()) {
+            throw new ServiceErrorException(SubscriptionExceptionEnum.ERR_ALREADY_SUBSCRIBED);
+        }
+
+        // PENDING 구독 체크 (중복 prepare 방지)
+        Optional<Subscription> pendingSubscription = subscriptionRepository
+                .findByUserIdAndSubscriptionStatus(userId, SubscriptionStatus.PENDING);
+
+        if (pendingSubscription.isPresent()) {
             throw new ServiceErrorException(SubscriptionExceptionEnum.ERR_ALREADY_SUBSCRIBED);
         }
     }
@@ -69,6 +78,15 @@ public class SubscriptionTransactionService {
         Subscription subscription = subscriptionRepository.findBySubscriptionKey(subscriptionKey)
                 .orElseThrow(() -> new ServiceErrorException(SubscriptionExceptionEnum.ERR_SUBSCRIPTION_KEY_NOT_FOUND));
 
+        // 🔒 Race condition 방어: complete 시점에 이미 ACTIVE 구독이 있는지 재확인
+        // (여러 PENDING이 동시에 complete를 시도하는 경우 방어)
+        Optional<Subscription> existingActive = subscriptionRepository
+                .findByUserIdAndSubscriptionStatus(subscription.getUserId(), SubscriptionStatus.ACTIVE);
+
+        if (existingActive.isPresent() && !existingActive.get().getId().equals(subscription.getId())) {
+            throw new ServiceErrorException(SubscriptionExceptionEnum.ERR_ALREADY_SUBSCRIBED);
+        }
+
         subscription.complete(billingKey, firstPaymentId);
         return subscriptionRepository.save(subscription);
     }
@@ -80,11 +98,28 @@ public class SubscriptionTransactionService {
         return paymentRepository.save(payment);
     }
 
-
     @Transactional
     public void createPurchase(Long userId, Long amount, Long paymentId) {
         Purchase purchase = Purchase.create(userId, PurchaseType.SUBSCRIPTION, amount, paymentId);
         purchaseRepository.save(purchase);
+    }
+
+    /**
+     * Payment와 Purchase를 단일 트랜잭션으로 생성
+     * 원자성 보장: 둘 다 성공하거나 둘 다 롤백
+     */
+    @Transactional
+    public Payment createPaymentAndPurchase(Long userId, String paymentKey, Long amount) {
+        // Payment 생성
+        Payment payment = Payment.create(userId, paymentKey, amount, null);
+        payment.complete(null);  // COMPLETED 상태로 전환
+        Payment savedPayment = paymentRepository.save(payment);
+
+        // Purchase 생성 (같은 트랜잭션)
+        Purchase purchase = Purchase.create(userId, PurchaseType.SUBSCRIPTION, amount, savedPayment.getId());
+        purchaseRepository.save(purchase);
+
+        return savedPayment;
     }
 
     @Transactional(readOnly = true)

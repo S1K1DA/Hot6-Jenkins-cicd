@@ -64,7 +64,7 @@ class FileUploadControllerTest {
         given(user.getPassword()).willReturn("password");
         given(user.getEmail()).willReturn("test@test.com");
 
-        userDetails = new UserDetailsImpl(user);
+        userDetails = new UserDetailsImpl(user, null);
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
         SecurityContextHolder.getContext().setAuthentication(authentication);

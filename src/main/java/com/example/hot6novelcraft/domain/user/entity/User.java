@@ -100,8 +100,6 @@ public class User extends BaseEntity {
         this.nickname = nickname;
         this.phoneNo = phoneNo;
         this.birthday = birthday;
-        this.password = "SOCIAL_LOGIN";
-        this.role=UserRole.TEMP;
     }
 
     // 회원정보 수정

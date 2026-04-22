@@ -87,6 +87,30 @@ public class JwtFilter extends OncePerRequestFilter {
             return;
         }
 
+        if (TEMP_TOKEN_ALLOWED_USERS.contains(requestURL) ||
+                requestURL.startsWith("/api/auth/social/signup")) {
+
+            // TempToken이 유효한지 껍데기만 검사
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith(JwtUtil.BEARER_PREFIX)) {
+                String token = jwtUtil.substringToken(authHeader);
+
+                // 토큰 유효성 검사
+                if(!jwtUtil.validateToken(token)){
+                    sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "토큰이 만료되었거나 유효하지 않습니다.");
+                    return;
+                }
+
+                if (!setAuthentication(response, token, requestURL)) {
+                return;
+                }
+            }
+
+            // DB 조회 없이 컨트롤러(서비스)로 패스!
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         // JWT 토큰 유무 검사
         String authorizationHeader = request.getHeader("Authorization");
 
@@ -174,32 +198,45 @@ public class JwtFilter extends OncePerRequestFilter {
 
         try {
             String email = jwtUtil.extractEmail(token);
-            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-
-            // 소셜 토큰 접근 제어
             AntPathMatcher pathMatcher = new AntPathMatcher();
+
+            // 토큰 타입 확인
             boolean isSocialToken = jwtUtil.isSocialToken(token);
-            if(isSocialToken && SOCIAL_TOKEN_ALLOWED_URLS.stream()
+            boolean isTempToken = jwtUtil.isTempToken(token);
+
+            // [인가 검증] 소셜/임시 토큰이지만 엉뚱한 주소인지 확인
+            if (isSocialToken && SOCIAL_TOKEN_ALLOWED_URLS.stream()
                     .noneMatch(patten -> pathMatcher.match(patten, requestURL))) {
 
                 log.warn("소셜 토큰으로 허용되지 않은 URL 접근, URL: {}", requestURL);
-                sendErrorResponse(response, HttpServletResponse.SC_FORBIDDEN,"소셜 회원가입을 먼저 완료해주세요.");
+                sendErrorResponse(response, HttpServletResponse.SC_FORBIDDEN, "소셜 회원가입을 먼저 완료해주세요.");
                 return false;
             }
 
-            boolean isTempoToken = jwtUtil.isTempToken(token);
-
-            if(isTempoToken && !TEMP_TOKEN_ALLOWED_USERS.contains(requestURL)) {
+            if (isTempToken && !TEMP_TOKEN_ALLOWED_USERS.contains(requestURL)) {
 
                 log.warn("임시 토큰으로 허용되지 않은 URL 접근, URL: {}", requestURL);
                 sendErrorResponse(response, HttpServletResponse.SC_FORBIDDEN, "추가 정보 회원가입이 필요합니다.");
                 return false;
             }
 
-            UsernamePasswordAuthenticationToken authentication =
+            // 가입 중인 유저 (Temp)는 DB 조회 없이 임시 객체 생성
+            UserDetails userDetails;
+
+            if (isSocialToken || isTempToken) {
+                // DB로 안가고 바로 임시 UserDetailsImpl 생성 -> 컨트롤러에 이메일 전달
+                userDetails = UserDetailsImpl.fromTemp(email, UserRole.TEMP);
+            } else {
+                // 일반 액세스토큰 일 때만 DB 조회
+                userDetails = userDetailsService.loadUserByUsername(email);
+            }
+
+            // 시큐리티 컨텍스트에 저장
+            UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken =
                     new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
             return true;
+
         } catch (Exception e) {
 
             log.error("인증 처리 중 오류 발생: {}", e.getMessage());

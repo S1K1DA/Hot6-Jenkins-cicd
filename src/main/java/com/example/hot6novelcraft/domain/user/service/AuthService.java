@@ -62,7 +62,6 @@ public class AuthService {
         try {
             authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.email(), request.password()));
-
         } catch (AuthenticationException e) {
             throw new ServiceErrorException(UserExceptionEnum.ERR_INVALID_EMAIL_OR_PASSWORD);
         }
@@ -276,7 +275,6 @@ public class AuthService {
     public void abandonRecovery(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ServiceErrorException(UserExceptionEnum.ERR_NOT_FOUND_USER));
-
         // 이 유저가 진짜 탈퇴 유예 상태인지 한 번 더 확인
         if (!user.isDeleted()) {
             throw new ServiceErrorException(UserExceptionEnum.ERR_NOT_WITHDRAWAL_PENDING);

@@ -5,9 +5,7 @@ import com.example.hot6novelcraft.common.exception.domain.UserExceptionEnum;
 import com.example.hot6novelcraft.common.security.JwtUtil;
 import com.example.hot6novelcraft.common.security.RedisUtil;
 import com.example.hot6novelcraft.domain.novel.entity.enums.MainGenre;
-import com.example.hot6novelcraft.domain.user.dto.request.AuthorRequest;
-import com.example.hot6novelcraft.domain.user.dto.request.CommonSignupRequest;
-import com.example.hot6novelcraft.domain.user.dto.request.SocialSignupRequest;
+import com.example.hot6novelcraft.domain.user.dto.request.*;
 import com.example.hot6novelcraft.domain.user.dto.response.SocialSignupResponse;
 import com.example.hot6novelcraft.domain.user.entity.User;
 import com.example.hot6novelcraft.domain.user.entity.enums.CareerLevel;
@@ -141,7 +139,11 @@ class SignupServiceTest {
             assertThat(result).isEqualTo(FAKE_TEMP_TOKEN);
 
             // then
-            verify(userRepository).save(any(User.class));
+            verify(redisUtil).set(
+                    eq("TEMP_SIGNUP:" + TEST_EMAIL),
+                    any(TempSignupRequest.class),
+                    anyLong()
+            );
         }
 
         @Test
@@ -206,7 +208,7 @@ class SignupServiceTest {
     }
 
     // ====================================================================
-    // 작가 추가 가입 테스트
+    // 작가 추가 가입 테스트 (2단계)
     // ====================================================================
     @Nested
     @DisplayName("작가 추가 가입 (authorSignup)")
@@ -216,27 +218,36 @@ class SignupServiceTest {
 
         @BeforeEach
         void setUp() {
-            validRequest = new AuthorRequest(
-                    List.of(MainGenre.FANTASY, MainGenre.ROMANCE_FANTASY)
-                    , "저는 판타지 작가입니다. 10년째 집필 중입니다."
-                    , CareerLevel.INTERMEDIATE
-                    , null
-                    , null
-                    , null
-                    , true
-            );
+            validRequest = new AuthorRequest(List.of(MainGenre.FANTASY), "소개", CareerLevel.INTERMEDIATE, null, null, null, true);
+        }
+
+        @Test
+        @DisplayName("[실패] Redis 바구니가 만료되었거나 없을 때 → ERR_INVALID_TOKEN 예외")
+        void authorSignup_fail_noBasket() {
+            // given
+            given(redisUtil.get("TEMP_SIGNUP:" + TEST_EMAIL)).willReturn(null);
+            given(redisUtil.get("TEMP_SOCIAL_SIGNUP:" + TEST_EMAIL)).willReturn(null);
+
+            // when & then
+            assertThatThrownBy(() -> signupService.authorSignup(validRequest, TEST_EMAIL))
+                    .isInstanceOf(ServiceErrorException.class)
+                    .hasMessage(UserExceptionEnum.ERR_INVALID_TOKEN.getMessage());
         }
 
         @Test
         @DisplayName("[실패] 이미 가입 완료된 AUTHOR 유저 → ERR_ALREADY_COMPLETED_SIGNUP 예외")
         void authorSignup_fail_alreadyCompleted() {
-
             // given
-            User authorUser = User.register(
-                    TEST_EMAIL, "encodedPw", TEST_NICKNAME, TEST_PHONE,
-                    LocalDate.of(1995, 1, 1), UserRole.AUTHOR
-            );
-            given(userRepository.findByEmail(TEST_EMAIL)).willReturn(Optional.of(authorUser));
+            User authorUser = User.register(TEST_EMAIL, "pw", TEST_NICKNAME, TEST_PHONE, LocalDate.now(), UserRole.AUTHOR);
+            lenient().when(userRepository.findByEmail(TEST_EMAIL)).thenReturn(Optional.of(authorUser));
+            lenient().when(userRepository.existsByEmail(TEST_EMAIL)).thenReturn(true);
+
+            // 바구니도 없는 상태 가정
+            TempSignupRequest tempDto = new TempSignupRequest(TEST_EMAIL, "pw", TEST_NICKNAME, TEST_PHONE, LocalDate.now());
+            given(redisUtil.get("TEMP_SOCIAL_SIGNUP:" + TEST_EMAIL)).willReturn(null);
+            given(redisUtil.get("TEMP_SIGNUP:" + TEST_EMAIL)).willReturn(tempDto);
+
+            lenient().when(userRepository.save(any(User.class))).thenReturn(authorUser);
 
             // when & then
             assertThatThrownBy(() -> signupService.authorSignup(validRequest, TEST_EMAIL))
@@ -257,35 +268,29 @@ class SignupServiceTest {
 
         @BeforeEach
         void setUp() {
-            validRequest = new SocialSignupRequest(
-                    TEST_NICKNAME
-                    , LocalDate.of(1995,1,1)
-                    , TEST_PHONE
-            );
+            validRequest = new SocialSignupRequest(TEST_NICKNAME, LocalDate.of(1995,1,1), TEST_PHONE);
         }
 
         @Test
-        @DisplayName("[성공] 소셜 신규 유저 공통 가입 → tempToken 반환")
+        @DisplayName("[성공] 소셜 추가 정보 입력 → Redis 임시 저장 및 tempToken 반환")
         void socialCommonSignup_success() {
-
             // given
             mockSmsVerified(TEST_PHONE);
-            given(userRepository.findByNickname(TEST_NICKNAME)).willReturn(Optional.ofNullable(null));;
-
-            User socialTempUser = createUser(false);
-            given(userRepository.findByEmail(TEST_EMAIL)).willReturn(Optional.of(socialTempUser));
+            given(userRepository.findByNickname(TEST_NICKNAME)).willReturn(Optional.empty());
+            given(userRepository.findByEmail(TEST_EMAIL)).willReturn(Optional.of(createUser(false)));
             given(jwtUtil.createTempToken(TEST_EMAIL)).willReturn(FAKE_TEMP_TOKEN);
 
             // when
-            SocialSignupResponse response = signupService.socialCommonSignup(
-                    validRequest, TEST_EMAIL, PROVIDER_ID, ProviderSns.GOOGLE
-            );
+            SocialSignupResponse response = signupService.socialCommonSignup(validRequest, TEST_EMAIL, PROVIDER_ID, ProviderSns.GOOGLE);
 
             // then
             assertThat(response.tempToken()).isEqualTo(FAKE_TEMP_TOKEN);
 
-            verify(socialAuthRepository, times(1)).save(any());
-            verify(redisUtil, times(1)).delete(REDIS_VERIFIED_KEY);
+            verify(redisUtil).set(
+                    eq("TEMP_SOCIAL_SIGNUP:" + TEST_EMAIL),
+                    any(TempSocialSignupRequest.class),
+                    anyLong()
+            );
         }
 
         @Test
@@ -329,18 +334,12 @@ class SignupServiceTest {
         @Test
         @DisplayName("[실패] 닉네임 중복 → ERR_NICKNAME_ALREADY_EXISTS 예외")
         void socialCommonSignup_fail_nicknameExists() {
+            mockSmsVerified(TEST_PHONE);
+            given(userRepository.findByNickname(TEST_NICKNAME)).willReturn(Optional.of(createUser(false)));
 
-        // given
-        mockSmsVerified(TEST_PHONE);
-        // 닉네임 조회 시 이미 누군가 사용 중임
-        given(userRepository.findByNickname(TEST_NICKNAME)).willReturn(Optional.of(createUser(false)));
-
-        // when & then
-        assertThatThrownBy(() -> signupService.socialCommonSignup(
-        validRequest, TEST_EMAIL, PROVIDER_ID, ProviderSns.GOOGLE
-        ))
-            .isInstanceOf(ServiceErrorException.class)
-            .hasMessage(UserExceptionEnum.ERR_NICKNAME_ALREADY_EXISTS.getMessage());
+            assertThatThrownBy(() -> signupService.socialCommonSignup(validRequest, TEST_EMAIL, PROVIDER_ID, ProviderSns.GOOGLE))
+                    .isInstanceOf(ServiceErrorException.class)
+                    .hasMessage(UserExceptionEnum.ERR_NICKNAME_ALREADY_EXISTS.getMessage());
         }
     }
 }

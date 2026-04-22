@@ -38,6 +38,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         // registrationId로 플랫폼 구분 (현재 구글만, 추후 kakao/naver 추가 시 여기만 확장)
         String registrationId = userRequest.getClientRegistration().getRegistrationId();
+
         ProviderSns provider = ProviderSns.from(registrationId);
 
         // 플렛폼 별 정보 추출 (email, ProviderId)
@@ -100,6 +101,11 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                     String kakaoEmail = kakaoAccount != null ? (String) kakaoAccount.get("email") : null;
                     yield kakaoEmail != null ? kakaoEmail : kakaoId + "@kakao.com"; //  이메일이 없으면 임시 생성
                 }
+                case "naver" -> {
+                    Map<String, Object> naverResponse = oAuth2User.getAttribute("response");
+                    String naverEmail = naverResponse != null ? (String) naverResponse.get("email") : null;
+                    yield naverEmail != null ? naverEmail : naverResponse.get("id") + "@naver.com";
+                }
                 default -> throw new OAuth2AuthenticationException(
                         new OAuth2Error("unsupported_provider"), "지원하지 않는 소셜 플랫폼입니다: " + registrationId);
             };
@@ -110,6 +116,10 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             return switch (registrationId.toLowerCase()) {
                 case "google" -> oAuth2User.getAttribute("sub");
                 case "kakao" -> String.valueOf(oAuth2User.getAttributes().get("id"));
+                case "naver" -> {
+                    Map<String, Object> naverResponse = oAuth2User.getAttribute("response");
+                    yield naverResponse != null ? (String) naverResponse.get("id") : null;
+                }
                 default -> throw new OAuth2AuthenticationException(
                         new OAuth2Error("unsupported_provider"), "지원하지 않는 소셜 플랫폼입니다: " + registrationId);
             };

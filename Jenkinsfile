@@ -67,7 +67,7 @@ pipeline {
                 ]) {
                     sshagent(['app-ec2-ssh-key']) {
                         sh """
-                            ssh -o StrictHostKeyChecking=no ec2-user@${APP_EC2_IP} << 'ENDSSH'
+                            ssh -o StrictHostKeyChecking=no ec2-user@${APP_EC2_IP} << ENDSSH
 
                                 # 기존 컨테이너 정지 & 삭제
                                 docker stop novelcraft || true

@@ -1,7 +1,6 @@
 app:
   frontend:
     url: ${FRONTEND_URL}
-
 spring:
   cloud:
     aws:

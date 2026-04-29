@@ -41,7 +41,7 @@ public class User extends BaseEntity {
     private UserRole role;
 
     // 성인 인증 여부
-    @Column(nullable = true)
+    @Column(nullable = false)
     private boolean isAdultVerified = false;
 
     private String refreshToken;
@@ -64,11 +64,6 @@ public class User extends BaseEntity {
     @PreRemove
     protected void preRemove() {
         deletedAt = LocalDateTime.now();
-    }
-
-    @PrePersist
-    protected void prePersist() {
-        adultVerifiedAt = LocalDateTime.now().plusYears(1L);
     }
 
     public static User register(String email, String password, String nickname, String phoneNo, LocalDate birthday, UserRole role) {
@@ -164,5 +159,19 @@ public class User extends BaseEntity {
 
     public void changeRole(UserRole role) {
         this.role = role;
+    }
+
+    // 성인 인증 완료 처리
+    public void verifyAdult() {
+        this.isAdultVerified = true;
+        this.adultVerifiedAt = LocalDateTime.now();
+    }
+
+    // 성인 인증 유효 여부 확인 (1년 유효기간)
+    public boolean isAdultVerificationValid() {
+        if(!isAdultVerified || adultVerifiedAt == null) {
+            return false;
+        }
+        return adultVerifiedAt.plusYears(1).isAfter(LocalDateTime.now());
     }
 }

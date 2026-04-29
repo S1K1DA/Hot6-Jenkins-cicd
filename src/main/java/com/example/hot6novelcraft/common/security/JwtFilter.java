@@ -142,18 +142,19 @@ public class JwtFilter extends OncePerRequestFilter {
                 log.error("[Redis 장애] 블랙리스트 확인 불가, URL: {}", requestURL);
 
                 // 중요 보안 API (결제, 수정, 삭제 등) : Fail-Closed 무조건 차단
-                if(isCriticalApi(requestURL)) {
-                    log.error("[Redis 장애] 보안을 위해 중요 API 접근을 차단합니다. URL: {}", requestURL);
-                    sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "서버 불안정으로 해당 기능을 사용할 수 없습니다.");
+                if(isSafeApi(request)) {
+                    log.warn("[Redis 장애] 가용성을 위해 읽기 전용 API 접근을 허용합니다. URL: {}", requestURL);                    sendErrorResponse(response, HttpServletResponse.SC_SERVICE_UNAVAILABLE, "서버 불안정으로 해당 기능을 사용할 수 없습니다.");
                     return;
 
+                } else {
+                    log.error("[Redis 장애] 데이터 보호를 위해 해당 API 접근을 기본 차단합니다. URL: {}", requestURL);
+                    sendErrorResponse(response, HttpServletResponse.SC_SERVICE_UNAVAILABLE, "현재 서버 불안정으로 해당 기능을 사용할 수 없습니다.");
+                    return;
                 }
 
-                // 일반 조회 API (소설 읽기, 랭킹 보기 등) : Fail-Open 가용성을 위해 허용
-                log.warn("[Redis 장애] 가용성을 위해 일반 API 접근을 허용합니다. URL: {}", requestURL);
             } catch (Exception e) {
                 log.error("Redis 검증 중 알 수 없는 에러 발생", e);
-                sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "서버 오류가 발생했습니다.");
+                sendErrorResponse(response, HttpServletResponse.SC_SERVICE_UNAVAILABLE, "서버 오류가 발생했습니다.");
                 return;
             }
 
@@ -281,15 +282,23 @@ public class JwtFilter extends OncePerRequestFilter {
     }
 
     // 차단할 중요 API 리스트 판별 메서드
-    private boolean isCriticalApi(String url) {
-        return url.startsWith("/api/payments/prepare") ||       // 결제 준비
-                url.startsWith("/api/payments/confirm") ||      // 결제 확인
-                url.startsWith("/api/payments/refunds") ||      // 환불 하기
-                url.startsWith("/api/revenue/me/exchanges") ||  // 환전 신청
-                url.startsWith("/api/auth/signup/reader") ||    // 비밀번호 변경
-                url.startsWith("/api/users/me/reader") ||       // 회원정보수정 (작가)
-                url.startsWith("/api/auth/users/me/author") ||  // 회원정보수정 (독자)
-                url.startsWith("/api/auth/users/me") ||         // 회원정보수정 (공통)
-                url.startsWith("/api/admin/**");                // 관리자
+    private boolean isSafeApi(HttpServletRequest request) {
+        String url = request.getRequestURI();
+        String method = request.getMethod();
+        AntPathMatcher pathMatcher = new AntPathMatcher();
+
+        // 상태를 변경하는 요청 (POST, PUT, PATCH, DELETE)는 차단
+        if(!method.equalsIgnoreCase("GET")) {
+            return false;
+        }
+
+        return pathMatcher.match("/api/novels/**", url) ||
+                pathMatcher.match("/api/search/**", url) ||
+                pathMatcher.match("/api/episodes/**", url) ||
+                pathMatcher.match("/api/reviews/**", url) ||
+                pathMatcher.match("/api/comments/**", url) ||
+                pathMatcher.match("/api/categories/**", url) ||
+                pathMatcher.match("/api/author/novels/**", url) ||
+                pathMatcher.match("/api/libraries/**", url);
     }
 }

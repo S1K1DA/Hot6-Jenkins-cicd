@@ -46,7 +46,8 @@ public class NovelRankingService {
 
         try {
             // 정상 : Redis에서 조회 시도
-            return buildRankingFromRedis(redisKey, 5);
+            return buildRankingFromRedis(type, 5);
+
         } catch (Exception e) {
             // 장애 : Redis 연결 실패 시 DB 쿼리로 우회
             log.error("[Redis 장애 발생] 랭킹 조회를 DB Fallback으로 전환합니다. type: {}, error: {}", type, e.getMessage());
@@ -100,16 +101,6 @@ public class NovelRankingService {
 
             // 삭제되었거나 데이터베이스에 없는 소설 체크
             if (novel == null || novel.isDeleted()) {
-                continue;
-            }
-
-            // 비공개(보류 및 휴재) 상태 체크
-            if(novel.getStatus() == NovelStatus.PENDING || novel.getStatus() == NovelStatus.HIATUS) {
-                continue;
-            }
-
-            // 성인 작품 제외 정책 (태그 문자열 검사)
-            if(novel.getTags() != null && novel.getTags().contains("성인") || novel.getTags().contains("19금")) {
                 continue;
             }
 

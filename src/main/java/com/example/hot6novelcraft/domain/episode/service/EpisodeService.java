@@ -12,6 +12,7 @@ import com.example.hot6novelcraft.domain.episode.entity.Episode;
 import com.example.hot6novelcraft.domain.episode.entity.enums.EpisodeStatus;
 import com.example.hot6novelcraft.domain.episode.repository.EpisodeRepository;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
+import com.example.hot6novelcraft.domain.novel.entity.enums.MainTag;
 import com.example.hot6novelcraft.domain.novel.entity.enums.NovelStatus;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
 import com.example.hot6novelcraft.domain.point.entity.enums.PointHistoryType;
@@ -325,7 +326,7 @@ public class EpisodeService {
 
         // 성인물 체크 로직 - 서하나
         boolean isAdult = novel.getTags() != null &&
-                (novel.getTags().contains("성인") || novel.getTags().contains("19금"));
+                (novel.getTags().contains(MainTag.ADULT.name()));
 
         // 퍼블릭 메인 랭킹 반영 여부 결정
         if (!isAdult) {
@@ -335,9 +336,6 @@ public class EpisodeService {
             // 성인 작품은 메인 랭킹 적재 차단 (추후 성인물 전용 랭킹이 생긴다면 추가)
             log.debug("[메인 랭킹 집계 제외] novelId: {} 은(는) 성인물입니다.", novelId);
         }
-
-        // Redis 랭킹 Zset 조회수 증가 호출 - 서하나
-        episodeCacheService.increaseRankingScore(novelId);
     }
 
     // 유료 회차 접근 제어 (PointHistory 이력 체크)

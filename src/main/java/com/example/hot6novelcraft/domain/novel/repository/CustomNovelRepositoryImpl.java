@@ -6,6 +6,7 @@ import com.example.hot6novelcraft.domain.novel.dto.response.NovelDetailResponse;
 import com.example.hot6novelcraft.domain.novel.dto.response.NovelListResponse;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.entity.QNovel;
+import com.example.hot6novelcraft.domain.novel.entity.enums.MainTag;
 import com.example.hot6novelcraft.domain.novel.entity.enums.NovelStatus;
 import com.example.hot6novelcraft.domain.user.entity.QUser;
 import com.querydsl.core.types.Projections;
@@ -165,7 +166,9 @@ public class CustomNovelRepositoryImpl implements CustomNovelRepository {
                 .selectFrom(novel)
                 .where(
                         novel.isDeleted.eq(false),
-                        novel.updatedAt.goe(oneHourAgo)
+                        novel.updatedAt.goe(oneHourAgo),
+                        novel.status.notIn(NovelStatus.PENDING, NovelStatus.HIATUS),
+                        novel.tags.contains(MainTag.ADULT.name()).not()
                 )
                 .orderBy(novel.viewCount.desc())
                 .limit(limit)
@@ -184,7 +187,9 @@ public class CustomNovelRepositoryImpl implements CustomNovelRepository {
                 .selectFrom(novel)
                 .where(
                         novel.isDeleted.eq(false),
-                        novel.updatedAt.goe(oneWeekAgo)
+                        novel.updatedAt.goe(oneWeekAgo),
+                        novel.status.notIn(NovelStatus.PENDING, NovelStatus.HIATUS),
+                        novel.tags.contains(MainTag.ADULT.name()).not()
                 )
                 .orderBy(novel.viewCount.desc())
                 .limit(limit)

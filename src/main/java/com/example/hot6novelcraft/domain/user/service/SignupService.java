@@ -247,6 +247,8 @@ public class SignupService {
         return SocialSignupResponse.of(tempToken, email, request.nickname());
     }
 
+    /** ================= 공통 메소드 ================= */
+
     // 소셜 독자
     private SignupResponse processSocialReaderSignup(ReaderSignupRequest request, String email, TempSocialSignupRequest tempRequest, String redisKey) {
 
@@ -265,6 +267,10 @@ public class SignupService {
                 , tempRequest.providerId()
                 , savedUser.getId()
         );
+
+        if(user.isAdult()) {
+            user.verifyAdult(); // 19살 이상일 시 "인증 완료"
+        }
 
         socialAuthRepository.save(socialAuth);
 
@@ -302,6 +308,10 @@ public class SignupService {
                 , request.mainGenreToString()
                 , request.readingGoal()
         );
+
+        if(user.isAdult()) {
+            user.verifyAdult(); // 19살 이상일 시 "인증 완료"
+        }
 
         readerProfileRepository.save(readerProfile);
 
@@ -341,6 +351,10 @@ public class SignupService {
                 , request.allowMenteeRequest()
         );
 
+        if(user.isAdult()) {
+            user.verifyAdult(); // 19살 이상일 시 "인증 완료"
+        }
+
         authorProfileRepository.save(authorProfile);
 
         return SignupResponse.of(user);
@@ -375,6 +389,9 @@ public class SignupService {
                 , request.allowMenteeRequest()
         );
 
+        if(user.isAdult()) {
+            user.verifyAdult(); // 19살 이상일 시 "인증 완료"
+        }
         authorProfileRepository.save(authorProfile);
 
         return SignupResponse.of(savedUser);

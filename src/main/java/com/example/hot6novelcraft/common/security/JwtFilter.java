@@ -60,7 +60,11 @@ public class JwtFilter extends OncePerRequestFilter {
                     , "/api/webhooks/portone"
                     , "/favicon.ico"
                     , "/login"          // 구글이 에러 시 여기로 리다이렉트
-                    , "/login?error");
+                    , "/login?error"
+                    , "/api/novels/ranking"
+                    , "/api/search/v2/novels"
+                    , "/api/search/v2/tags"
+                    , "/api/search/v2/authors");
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -199,10 +203,7 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         UserDetailsImpl userDetailsImpl = (UserDetailsImpl) userDetailsService.loadUserByUsername(email);
-        String newAccessToken = jwtUtil.createAccessToken(
-                userDetailsImpl.getUser().getEmail(),
-                userDetailsImpl.getUser().getRole()
-        );
+        String newAccessToken = jwtUtil.createAccessToken(userDetailsImpl.getUser());
 
         response.setHeader("Authorization", newAccessToken);
         response.setHeader("Access-Control-Expose-Headers", "Authorization");

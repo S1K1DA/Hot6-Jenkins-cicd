@@ -4,6 +4,7 @@ import com.example.hot6novelcraft.common.dto.PageResponse;
 import com.example.hot6novelcraft.common.exception.ServiceErrorException;
 import com.example.hot6novelcraft.common.exception.domain.EpisodeExceptionEnum;
 import com.example.hot6novelcraft.common.exception.domain.NovelExceptionEnum;
+import com.example.hot6novelcraft.common.exception.domain.UserExceptionEnum;
 import com.example.hot6novelcraft.domain.episode.dto.cache.EpisodeBulkCache;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeCreateRequest;
 import com.example.hot6novelcraft.domain.episode.dto.request.EpisodeUpdateRequest;
@@ -203,6 +204,9 @@ public class EpisodeService {
             throw new ServiceErrorException(EpisodeExceptionEnum.EPISODE_NOT_PUBLISHED);
         }
 
+        // 성인 컨텐츠 권한 확인 -서하나
+        validateReaderAdultAccess(episode.getNovelId(), userDetails);
+
         // 유료 회차 접근 제어 (PointHistory 이력 체크)
         validateEpisodeAccess(episode, userId);
 
@@ -230,6 +234,9 @@ public class EpisodeService {
         if (meta.status() != EpisodeStatus.PUBLISHED) {
             throw new ServiceErrorException(EpisodeExceptionEnum.EPISODE_NOT_PUBLISHED);
         }
+
+        // 성인 컨텐츠 열람 권한 확인 - 서하나
+        validateReaderAdultAccess(meta.novelId(), userDetails);
 
         // 유료 회차 접근 제어 (메타 기반)
         validateEpisodeAccessByMeta(meta, userId);
@@ -442,5 +449,19 @@ public class EpisodeService {
                 .findFirst()
                 .map(this::toDetailResponse)
                 .orElseThrow(() -> new ServiceErrorException(EpisodeExceptionEnum.EPISODE_NOT_FOUND));
+    }
+
+    // [독자용] 성인 열람 권한 확인
+    private void validateReaderAdultAccess(Long novelId, UserDetailsImpl userDetails) {
+        Novel novel = novelRepository.findById(novelId)
+                .orElseThrow(() -> new ServiceErrorException(NovelExceptionEnum.NOVEL_NOT_FOUND));
+
+        boolean isAdultContent = novel.getTags() != null && novel.getTags().contains(MainTag.ADULT.name());
+
+        if(isAdultContent) {
+            if(!userDetails.getUser().isAdultVerificationValid()) {
+                throw new ServiceErrorException(UserExceptionEnum.ERR_ADULT_VERIFICATION_REQUIRED);
+            }
+        }
     }
 }

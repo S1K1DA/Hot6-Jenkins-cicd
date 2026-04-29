@@ -7,6 +7,7 @@ import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.UUID;
 
 @Getter
@@ -161,13 +162,22 @@ public class User extends BaseEntity {
         this.role = role;
     }
 
-    // 성인 인증 완료 처리
+    // 단순 나이 계산
+    public boolean isAdult() {
+        if(this.birthday == null) {
+            return false;
+        }
+        int age = Period.between(this.birthday, LocalDate.now()).getYears();
+        return age >= 19;
+    }
+
+    // 성인 인증
     public void verifyAdult() {
         this.isAdultVerified = true;
         this.adultVerifiedAt = LocalDateTime.now();
     }
 
-    // 성인 인증 유효 여부 확인 (1년 유효기간)
+    // 성인 인증 완료 (1년 유효기간)
     public boolean isAdultVerificationValid() {
         if(!isAdultVerified || adultVerifiedAt == null) {
             return false;

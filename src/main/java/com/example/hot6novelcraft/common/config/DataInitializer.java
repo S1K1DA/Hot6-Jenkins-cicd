@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@Profile({"local", "dev", "test"})
+//@Profile({"local", "dev", "test"})
 public class DataInitializer implements ApplicationRunner {
 
     private final UserRepository userRepository;
@@ -82,6 +82,7 @@ public class DataInitializer implements ApplicationRunner {
         saveNovelAndRanking(user3.getId(), "심해의 군주", "바다물 판타지", "FANTASY", "DUNGEON,MUNCHKIN", 5000, 30000);
         saveNovelAndRanking(user2.getId(), "비밀스러운 계약", "잔잔한 로맨스", "ROMANCE", "ROMANCE,HEALING", 1500, 8000);
         saveNovelAndRanking(user1.getId(), "삭제될 운명의 소설", "삭제 테스트", "FANTASY", "TEST", 0, 0);
+        saveNovelAndRanking(user3.getId(), "성인 인증 테스트 소설", "성인 인증 테스트", "HORROR", "ADULT", 7000, 43000);
 
         // ========================
         // 3. 신작 조회 테스트용 날짜 강제 조작 (JPA Auditing 무시하고 직접 SQL 실행)

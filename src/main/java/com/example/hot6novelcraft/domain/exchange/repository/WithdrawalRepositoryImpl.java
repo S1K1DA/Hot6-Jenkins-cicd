@@ -55,6 +55,39 @@ public class WithdrawalRepositoryImpl implements WithdrawalRepositoryCustom {
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
     }
 
+    @Override
+    public Page<Withdrawal> findAllWithFilters(
+            WithdrawalStatus status,
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            Pageable pageable
+    ) {
+        QWithdrawal withdrawal = QWithdrawal.withdrawal;
+
+        List<Withdrawal> content = queryFactory
+                .selectFrom(withdrawal)
+                .where(
+                        statusEq(status),
+                        requestedAtGoe(startDate),
+                        requestedAtLoe(endDate)
+                )
+                .orderBy(withdrawal.requestedAt.desc())
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        JPAQuery<Long> countQuery = queryFactory
+                .select(withdrawal.count())
+                .from(withdrawal)
+                .where(
+                        statusEq(status),
+                        requestedAtGoe(startDate),
+                        requestedAtLoe(endDate)
+                );
+
+        return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
+    }
+
     private BooleanExpression statusEq(WithdrawalStatus status) {
         return status != null ? QWithdrawal.withdrawal.status.eq(status) : null;
     }

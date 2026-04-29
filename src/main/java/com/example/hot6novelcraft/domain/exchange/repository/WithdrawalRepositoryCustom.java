@@ -16,4 +16,12 @@ public interface WithdrawalRepositoryCustom {
             LocalDateTime endDate,
             Pageable pageable
     );
+
+    // 관리자 전체 환전 내역 조회 (authorId 없음)
+    Page<Withdrawal> findAllWithFilters(
+            WithdrawalStatus status,
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            Pageable pageable
+    );
 }

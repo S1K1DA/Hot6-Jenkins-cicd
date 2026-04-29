@@ -22,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +38,16 @@ public class WithdrawalService {
 
     private static final String WITHDRAWAL_LOCK_PREFIX = "lock:withdrawal:";
     private static final long LOCK_TIMEOUT_SECONDS = 5;
+
+    // [CodeRabbit] get → delete 비원자성 문제 해결: Lua Script로 원자적 락 해제
+    private static final DefaultRedisScript<Long> RELEASE_LOCK_SCRIPT = new DefaultRedisScript<>(
+            "if redis.call('get', KEYS[1]) == ARGV[1] then " +
+                    "  return redis.call('del', KEYS[1]) " +
+                    "else " +
+                    "  return 0 " +
+                    "end",
+            Long.class
+    );
 
     private final WithdrawalRepository withdrawalRepository;
     private final RevenueRepository revenueRepository;
@@ -61,24 +72,18 @@ public class WithdrawalService {
     public WithdrawalResponse createWithdrawal(Long authorId, WithdrawalCreateRequest request) {
         String lockKey = WITHDRAWAL_LOCK_PREFIX + authorId;
         String lockValue = java.util.UUID.randomUUID().toString();
-
-        // 락 획득 시도
         Boolean acquired = redisTemplate.opsForValue()
                 .setIfAbsent(lockKey, lockValue, LOCK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
         if (Boolean.FALSE.equals(acquired)) {
-            // 대기 중인 환전 건이 있다는 예외 코드 반환
             throw new ServiceErrorException(ExchangeExceptionEnum.WITHDRAWAL_PENDING_EXISTS);
         }
 
         try {
             return processWithdrawal(authorId, request);
         } finally {
-            //[개선] 락 해제 시 현재 벨류를 확인하여 타인이 획득한 락을 지우지 않도록 보호
-            Object currentValue = redisTemplate.opsForValue().get(lockKey);
-            if (lockValue.equals(currentValue)) {
-                redisTemplate.delete(lockKey);
-            }
+            // [CodeRabbit] Lua Script로 원자적 락 해제 — 내가 잡은 락인 경우에만 삭제
+            redisTemplate.execute(RELEASE_LOCK_SCRIPT, List.of(lockKey), lockValue);
         }
     }
 
@@ -193,7 +198,6 @@ public class WithdrawalService {
         Withdrawal withdrawal = withdrawalRepository.findById(withdrawalId)
                 .orElseThrow(() -> new ServiceErrorException(ExchangeExceptionEnum.WITHDRAWAL_NOT_FOUND));
 
-        withdrawal.processing();
         withdrawal.complete();
 
         log.info("환전 승인 완료 - withdrawalId: {}, authorId: {}", withdrawalId, withdrawal.getAuthorId());
@@ -243,5 +247,42 @@ public class WithdrawalService {
         statisticsService.evictStatisticsCache(withdrawal.getAuthorId());
 
         return WithdrawalResponse.from(withdrawal);
+    }
+
+    /**
+     * [관리자] 전체 환전 신청 목록 조회
+     */
+    public PageResponse<WithdrawalResponse> getAllWithdrawals(
+            WithdrawalStatus status,
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            Pageable pageable
+    ) {
+        Page<Withdrawal> page = withdrawalRepository.findAllWithFilters(status, startDate, endDate, pageable);
+        return PageResponse.register(page.map(WithdrawalResponse::from));
+    }
+
+    /**
+     * [관리자] 환전 상세 조회 (authorId 없이 조회)
+     */
+    public WithdrawalDetailResponse getWithdrawalDetailForAdmin(Long withdrawalId) {
+        Withdrawal withdrawal = withdrawalRepository.findById(withdrawalId)
+                .orElseThrow(() -> new ServiceErrorException(ExchangeExceptionEnum.WITHDRAWAL_NOT_FOUND));
+
+        BankAccount bankAccount = bankAccountRepository.findById(withdrawal.getBankAccountId())
+                .orElseThrow(() -> new ServiceErrorException(ExchangeExceptionEnum.BANK_ACCOUNT_NOT_FOUND));
+
+        String decryptedNumber = aesEncryptionUtil.decrypt(bankAccount.getAccountNumber());
+        String maskedNumber = bankAccount.getMaskedAccountNumber(decryptedNumber);
+
+        BankAccountInfoResponse bankAccountInfo = BankAccountInfoResponse.of(
+                bankAccount.getId(),
+                bankAccount.getBankName(),
+                maskedNumber,
+                bankAccount.getAccountHolder(),
+                bankAccount.getIsVerified()
+        );
+
+        return WithdrawalDetailResponse.of(withdrawal, bankAccountInfo);
     }
 }

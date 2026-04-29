@@ -62,7 +62,7 @@ public class LocalBankVerificationClient implements BankVerificationClient {
         String code = String.format("%04d", RANDOM.nextInt(10000));
 
         log.debug("[Local] 1원 입금 시뮬레이션 - 은행: {}, 계좌: {}", bankName, maskAccount(accountNumber));
-        log.info("[Local] 인증코드 발급 완료 (서버 로그에서만 확인 가능)");
+        log.info("[Local] 테스트용 인증코드: {}", code);
 
         return code;
     }

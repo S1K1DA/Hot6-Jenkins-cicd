@@ -17,6 +17,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.SQLIntegrityConstraintViolationException;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -42,21 +44,42 @@ public class NotificationService {
                 event.referenceId(),
                 event.referenceType()
         );
+        boolean isDuplicate = false;
         try {
             notificationRepository.save(notification);
         } catch (DataIntegrityViolationException e) {
-            log.warn("[알림] 중복 이벤트 무시 eventId={} userId={} type={}", event.eventId(), event.userId(), event.type());
-            return;
+            if (!isDuplicateEventId(e)) {
+                // eventId 외 필드 제약 위반(null, 길이 초과 등) → 재던져서 Kafka 재소비로 재처리
+                log.error("[알림] 저장 실패 (데이터 오류) eventId={} userId={}", event.eventId(), event.userId(), e);
+                throw e;
+            }
+            // eventId 중복: DB 저장은 이미 완료됐으나 WebSocket 전송이 누락된 케이스 → 재시도
+            log.warn("[알림] 중복 이벤트 감지 - WebSocket 재전송 시도 eventId={} userId={}", event.eventId(), event.userId());
+            notification = notificationRepository.findByEventId(event.eventId()).orElse(null);
+            if (notification == null) {
+                log.error("[알림] 중복 이벤트인데 DB 조회 실패 eventId={}", event.eventId());
+                return;
+            }
+            isDuplicate = true;
         }
 
         // WebSocket 전송: DB 커밋 후 별도로 수행, 실패해도 Kafka 재소비 방지
         try {
             NotificationResponse response = NotificationResponse.from(notification);
             messagingTemplate.convertAndSend("/topic/notifications/" + event.userId(), response);
-            log.info("[알림] 저장 및 WebSocket 전송 완료 eventId={} userId={} type={}", event.eventId(), event.userId(), event.type());
+            log.info("[알림] {} WebSocket 전송 완료 eventId={} userId={} type={}",
+                    isDuplicate ? "재전송" : "저장 및", event.eventId(), event.userId(), event.type());
         } catch (Exception e) {
             log.warn("[알림] WebSocket 전송 실패 (DB 저장은 완료) userId={} type={}", event.userId(), event.type(), e);
         }
+    }
+
+    private boolean isDuplicateEventId(DataIntegrityViolationException e) {
+        Throwable cause = e.getCause();
+        String message = (cause instanceof SQLIntegrityConstraintViolationException)
+                ? cause.getMessage()
+                : e.getMessage();
+        return message != null && message.contains("event_id");
     }
 
     @Transactional(readOnly = true)

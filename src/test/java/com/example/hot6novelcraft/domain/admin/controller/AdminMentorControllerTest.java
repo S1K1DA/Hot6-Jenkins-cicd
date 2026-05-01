@@ -220,11 +220,11 @@ class AdminMentorControllerTest {
         void approveMentor_멘토없음_404() throws Exception {
             // given
             setAuth("ADMIN");
-            given(adminMentorService.getPendingProficientMentors())
-                    .willThrow(new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND));
+            doThrow(new ServiceErrorException(MentorExceptionEnum.MENTOR_NOT_FOUND))
+                    .when(adminMentorService).approveMentor(1L);
 
             // when & then
-            mockMvc.perform(get("/api/admin/mentors/pending"))
+            mockMvc.perform(get("/api/admin/mentors/{mentorId}/approve", 1L))
                     .andDo(print())
                     .andExpect(status().isNotFound());
         }

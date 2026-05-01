@@ -32,6 +32,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -258,6 +259,6 @@ class AuthServiceTest {
 
         // then
         verify(userCacheService).deleteRefreshToken(TEST_EMAIL);
-        verify(redisUtil).setBlackList(eq("valid-token"), eq("Logout"), any());
+        verify(redisUtil).setBlackList("valid-token", "Logout", Duration.ofMillis(1000L));
     }
 }

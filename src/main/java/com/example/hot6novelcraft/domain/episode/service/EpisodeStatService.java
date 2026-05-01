@@ -36,6 +36,10 @@ public class EpisodeStatService {
             throw new ServiceErrorException(NovelExceptionEnum.NOVEL_STAT_FORBIDDEN);
         }
 
+        if (novel.isDeleted()) {
+            throw new ServiceErrorException(NovelExceptionEnum.NOVEL_ALREADY_DELETED);
+        }
+
         // DB에서 회차별 통계 조회 (JOIN+GROUP BY)
         List<EpisodeStatResponse> stats = episodeRepository.findEpisodeStatsByNovelId(novelId);
 

@@ -36,6 +36,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 @MockitoSettings(strictness = Strictness.LENIENT)
 @ExtendWith(MockitoExtension.class)
@@ -347,5 +349,90 @@ class NovelServiceTest {
 
         assertThrows(ServiceErrorException.class,
                 () -> novelService.getAuthorNovelList(userDetails, Pageable.ofSize(20)));
+    }
+
+    // ==================== 신작 소설 조회 ====================
+
+    @Test
+    void 신작소설조회_캐시없으면_DB조회후_캐싱_성공() {
+        // given
+        ValueOperations<String, Object> valueOps = mock(ValueOperations.class);
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+        // 캐시 조회 시 null 반환 (캐시 MISS)
+        given(valueOps.get(any())).willReturn(null);
+
+        List<NovelListResponse> mockNovelList = List.of(
+                NovelListResponse.of(1L, "신작 소설", "FANTASY", "NEW", NovelStatus.ONGOING,
+                        null, 0L, 0, "테스트작가")
+        );
+
+        // DB 조회 Mocking
+        given(novelRepository.findNewNovelList(any(), any(), eq(50))).willReturn(mockNovelList);
+
+        // when
+        List<NovelListResponse> response = novelService.getNewNovelList(null, null, 50);
+
+        // then
+        assertNotNull(response);
+        assertEquals(1, response.size());
+        assertEquals("신작 소설", response.get(0).title());
+
+        // DB를 조회했는지 검증
+        verify(novelRepository).findNewNovelList(any(), any(), eq(50));
+        // Redis에 저장했는지 검증
+        verify(valueOps).set(any(), eq(mockNovelList), any());
+    }
+
+    @Test
+    void 신작소설조회_캐시있으면_캐시반환_성공() {
+        // given
+        ValueOperations<String, Object> valueOps = mock(ValueOperations.class);
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+
+        List<NovelListResponse> cachedNovelList = List.of(
+                NovelListResponse.of(1L, "캐싱된 신작 소설", "FANTASY", "NEW", NovelStatus.ONGOING,
+                        null, 0L, 0, "테스트작가")
+        );
+
+        // 캐시 조회 시 데이터 반환 (캐시 HIT)
+        given(valueOps.get(any())).willReturn(cachedNovelList);
+
+        // when
+        List<NovelListResponse> response = novelService.getNewNovelList(null, null, 50);
+
+        // then
+        assertNotNull(response);
+        assertEquals(1, response.size());
+        assertEquals("캐싱된 신작 소설", response.get(0).title());
+
+        // 캐시를 사용했으므로 DB 조회(findNewNovelList)는 호출되지 않아야 함
+        verify(novelRepository, never()).findNewNovelList(any(), any(), any(Integer.class));
+    }
+
+    @Test
+    void 신작소설조회_레디스읽기에러시_DB조회_성공() {
+        // given
+        ValueOperations<String, Object> valueOps = mock(ValueOperations.class);
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+
+        // Redis 조회 시 예외 발생
+        given(valueOps.get(any())).willThrow(new RuntimeException("Redis Connection Error"));
+
+        List<NovelListResponse> mockNovelList = List.of(
+                NovelListResponse.of(1L, "DB 폴백 신작 소설", "FANTASY", "NEW", NovelStatus.ONGOING,
+                        null, 0L, 0, "테스트작가")
+        );
+
+        given(novelRepository.findNewNovelList(any(), any(), eq(50))).willReturn(mockNovelList);
+
+        // when
+        List<NovelListResponse> response = novelService.getNewNovelList(null, null, 50);
+
+        // then
+        assertNotNull(response);
+        assertEquals(1, response.size());
+
+        // Redis 에러가 나도 서비스 로직에서 catch 처리 후 DB를 정상적으로 조회해야 함
+        verify(novelRepository).findNewNovelList(any(), any(), eq(50));
     }
 }

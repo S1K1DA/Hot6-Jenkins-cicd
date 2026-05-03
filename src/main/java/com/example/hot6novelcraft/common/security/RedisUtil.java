@@ -122,4 +122,32 @@ public class RedisUtil {
             log.warn("[RedisLock] 락 해제 스킵 (현재 스레드가 소유하지 않음) key={}", key);
         }
     }
+
+    /** 대시보드 통계용 - TTL 초 단위
+     * 1. setWithSeconds 으로 초단위 업데이트 설정
+     * 2. 캐시 값 문자열로 파싱
+     * 3. Redis INCR + 1 (동시성 제어)
+     *    키가 없으면 1로 초기화하고 TTL 설정
+     **/
+    public void setWithSeconds(String key, Object value, long seconds) {
+
+        redisTemplate.opsForValue().set(key, value, Duration.ofSeconds(seconds));
+
+    }
+
+    public String getAsString(String key) {
+
+        Object value = redisTemplate.opsForValue().get(key);
+
+        return value != null ? value.toString() : null;
+
+    }
+    public void incrementWithSeconds(String key, long durationSeconds) {
+        Long count = redisTemplate.opsForValue().increment(key);
+
+        // 처음 만들어진 키 (count == 1) 라면 자정까지 TTL 세팅
+        if(count != null && count == 1) {
+            redisTemplate.expire(key, Duration.ofSeconds(durationSeconds));
+        }
+    }
 }

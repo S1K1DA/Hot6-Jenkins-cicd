@@ -12,6 +12,10 @@ import lombok.*;
 @Builder
 @AllArgsConstructor
 @Table(name = "mentors")
+//, indexes = {
+//        @Index(name = "idx_mentor_status", columnList = "status") // 승인 상태별 멘토 조회
+//        , @Index(name = "idx_mentor_created_at", columnList = "created_at") // 신규 멘토 조회
+//})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Mentor extends BaseEntity {

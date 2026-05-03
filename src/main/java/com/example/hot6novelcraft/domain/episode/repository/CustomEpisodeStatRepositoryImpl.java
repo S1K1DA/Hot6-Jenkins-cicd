@@ -33,8 +33,8 @@ public class CustomEpisodeStatRepositoryImpl implements CustomEpisodeStatReposit
                         episode.episodeNumber,
                         episode.title,
                         episode.likeCount,
-                        comment.id.count(),
-                        pointHistory.id.count()
+                        comment.id.countDistinct(),
+                        pointHistory.id.countDistinct()
                 ))
                 .from(episode)
                 .leftJoin(comment).on(comment.episodeId.eq(episode.id))

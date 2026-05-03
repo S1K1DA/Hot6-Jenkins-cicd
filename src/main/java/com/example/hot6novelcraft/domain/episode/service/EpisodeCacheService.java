@@ -146,7 +146,13 @@ public class EpisodeCacheService {
         String key = "episode_daily_view_count::" + episodeId + "::"
                 + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         Object count = redisTemplate.opsForValue().get(key);
-        return count != null ? Long.parseLong(count.toString()) : 0L;
+        if (count == null) return 0L;
+        try {
+            return Long.parseLong(count.toString());
+        } catch (NumberFormatException e) {
+            log.warn("[회차 일일 조회수 파싱 실패] key: {}, value: {}", key, count);
+            return 0L;
+        }
     }
 
     // Redis에 저장된 조회수 조회

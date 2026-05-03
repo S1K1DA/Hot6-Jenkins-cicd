@@ -22,6 +22,8 @@ public class AdminCacheService {
     public static final String NEW_NOVELS_TODAY_KEY = "admin:stats:new_novels_today:";
     public static final String NEW_MENTORS_TODAY_KEY = "admin:stats:new_mentors_today:";
 
+    private static final long CACHE_TTL_SECONDS = 60 * 60 * 48; // 48시간
+
     // 00시 자정까지 남은 시간을 초 단위로 계산
     public static long getMidnightTime() {
         LocalDateTime now = LocalDateTime.now();
@@ -30,7 +32,7 @@ public class AdminCacheService {
     }
 
     // 오늘 신규 가입 회원 수 조회 (캐시 먼저 -> 없으면 DB -> DB 결과 캐시 저장)
-    public Long getNewUsersToday() {
+    public Long getNewUsersByDate() {
         String key = getTodayUsersKey();
         String cached = redisUtil.getAsString(key);
 
@@ -45,13 +47,13 @@ public class AdminCacheService {
         redisUtil.setWithSeconds(
                 key
                 , String.valueOf(count)
-                , getMidnightTime()
+                , CACHE_TTL_SECONDS
         );
         return count;
     }
 
     // 오늘 신규 등록 소설 수 조회 (캐시 먼저 -> 없으면 DB -> DB 결과 캐시 저장)
-    public Long getNewNovelsToday() {
+    public Long getNewNovelsByDate() {
         String key = getTodayNovelsKey();
         String cached = redisUtil.getAsString(key);
 
@@ -64,15 +66,15 @@ public class AdminCacheService {
         Long count = customAdminRepository.countNewNovelsToday();
 
         redisUtil.setWithSeconds(
-                NEW_NOVELS_TODAY_KEY
+                key
                 , String.valueOf(count)
-                , getMidnightTime()
+                , CACHE_TTL_SECONDS
         );
         return count;
     }
 
     // 오늘 신규 등록 멘토 수 조회 (캐시 먼저 -> 없으면 DB -> DB 결과 캐시 저장)
-    public Long getNewMentoToday() {
+    public Long getNewMentosByDate() {
         String key = getTodayMentorsKey();
         String cached = redisUtil.getAsString(key);
 
@@ -82,22 +84,42 @@ public class AdminCacheService {
         }
 
         log.info("[Cache MISS] 신규 멘토 DB 조회");
-        Long count = customAdminRepository.countNewNovelsToday();
+        Long count = customAdminRepository.countNewMentorsToday();
 
         redisUtil.setWithSeconds(
-                NEW_MENTORS_TODAY_KEY
+                key
                 , String.valueOf(count)
-                , getMidnightTime()
+                , CACHE_TTL_SECONDS
         );
         return count;
     }
 
+    /** ====== [스케쥴용] 특정 날짜 캐시 직접 조회====== **/
+    public Long getNewUsersByDate(LocalDate targetDate) {
+        String key = NEW_USERS_TODAY_KEY + targetDate;
+        String cached = redisUtil.getAsString(key);
+        return cached != null ? Long.parseLong(cached) : 0L;
+    }
+
+    public Long getNewNovelsByDate(LocalDate targetDate) {
+        String key = NEW_NOVELS_TODAY_KEY + targetDate;
+        String cached = redisUtil.getAsString(key);
+        return cached != null ? Long.parseLong(cached) : 0L;
+    }
+
+    public Long getNewMentosByDate(LocalDate targetDate) {
+        String key = NEW_MENTORS_TODAY_KEY + targetDate;
+        String cached = redisUtil.getAsString(key);
+        return cached != null ? Long.parseLong(cached) : 0L;
+    }
+
     /** ====== 실시간 데이터 생성 시 카운트 +1 증가 ====== **/
+
     // 회원 가입 완료 시 -> Redis 원자적 +1 (동시성)
     public void incrementNewUsersToday() {
         String key = getTodayUsersKey();
 
-        redisUtil.incrementWithSeconds(key, getMidnightTime());
+        redisUtil.incrementWithSeconds(key, CACHE_TTL_SECONDS);
         log.info("[Cache UPDATE] 신규 회원 가입 +1");
     }
 
@@ -105,48 +127,29 @@ public class AdminCacheService {
     public void incrementNewNovelsToday() {
         String key = getTodayNovelsKey();
 
-        redisUtil.incrementWithSeconds(key, getMidnightTime());
+        redisUtil.incrementWithSeconds(key, CACHE_TTL_SECONDS);
         log.info("[Cache UPDATE] 신작 소설 등록 +1");
     }
 
     // 신규 멘토 등록 완료 시 -> Redis 원자적 +1 (동시성)
     public void incrementNewMentorsToday() {
-        String key = getTodayUsersKey();
+        String key = getTodayMentorsKey();
 
-        redisUtil.incrementWithSeconds(key, getMidnightTime());
+        redisUtil.incrementWithSeconds(key, CACHE_TTL_SECONDS);
         log.info("[Cache UPDATE] 신규 멘토 등록 +1");
     }
-
-//    /** ====== 과거 데이터 조회 ======= */
-//    public Long getStatusUsersByDate(LocalDate targetDate) {
-//        if(targetDate.equals(LocalDate.now())) {
-//            // 오늘 통계면 Redis 실시간 캐시 로직 호출
-//            return getNewUsersToday();
-//        } else {
-//            return customAdminRepository.countUsersByDate(targetDate);
-//        }
-//    }
-//
-//    public Long getStatusNovelsByDate(LocalDate targetDate) {
-//        if(targetDate.equals(LocalDate.now())) {
-//            // 오늘 통계면 Redis 실시간 캐시 로직 호출
-//            return getNewNovelsToday();
-//        } else {
-//            return customAdminRepository.countNovelByDate(targetDate);
-//        }
-//    }
 
     /** ====== key 생성 공통 메소드 ======= */
     // 오늘 날짜가 붙은 key 생성
     private String getTodayUsersKey() {
-        return NEW_USERS_TODAY_KEY + LocalDate.now().toString();
+        return NEW_USERS_TODAY_KEY + LocalDate.now();
     }
 
     private String getTodayNovelsKey() {
-        return NEW_NOVELS_TODAY_KEY + LocalDate.now().toString();
+        return NEW_NOVELS_TODAY_KEY + LocalDate.now();
     }
 
     private String getTodayMentorsKey() {
-        return NEW_MENTORS_TODAY_KEY + LocalDate.now().toString();
+        return NEW_MENTORS_TODAY_KEY + LocalDate.now();
     }
 }

@@ -13,9 +13,9 @@ export const options = {
 };
 
 const BASE_URL = 'http://localhost:8080/api';
-// ⚠️ 여기에 실제 토큰 넣는 거 잊지 마!
-const TOKEN =
-    'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzdXBlckBhZG1pbi5jb20iLCJyb2xlIjoiU1VQRVJfQURNSU4iLCJ0eXBlIjoiQUNDRVNTIiwiaXNBZHVsdCI6ZmFsc2UsImlhdCI6MTc3NzczNjM0NywiZXhwIjoxNzc3NzU3OTQ3fQ.tiGkinrqaOxUogPZu24ltAnyuMLtjOyml8d6cy_lY8o';
+
+// 포스트맨 발급 토큰 넣기
+const TOKEN = 'POSTMAN_ACCESS_TOKEN'
 
 export default function () {
     const params = {
@@ -29,7 +29,7 @@ export default function () {
     let responses = http.batch([
         ['GET', `${BASE_URL}/admin/dashboard/v1`, null, params],
         ['GET', `${BASE_URL}/admin/dashboard/v1?novelStatus=`, null, params],
-        // 필요하면 통계 v1 API 더 추가해!
+        // 필요하면 통계 v1 API 더 추가하기
     ]);
 
     console.log("Response Body: " + responses[0].body);

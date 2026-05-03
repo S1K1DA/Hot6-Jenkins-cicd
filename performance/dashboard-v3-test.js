@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
+// V1, V2와 완전히 동일한 부하 조건
 export const options = {
     stages: [
         { duration: '30s', target: 20 },
@@ -20,16 +21,21 @@ const TOKEN = 'POSTMAN_ACCESS_TOKEN'
 export default function () {
     const params = {
         headers: {
-            'Authorization': `Bearer ${TOKEN}`,
+            'Authorization': `Bearer ${TOKEN}`, // 다시 Bearer 방식으로 원복
             'Content-Type': 'application/json',
         },
+        // 이 태그가 있어야 그라파나에서 V3 그래프가 보임
+        tags: {
+            name: 'V3_Redis_Live'
+        }
     };
 
-    // V2 병합 API 호출
-    let res1 = http.get(`${BASE_URL}/admin/dashboard/v2`, params);
-    let res2 = http.get(`${BASE_URL}/admin/dashboard/v2?novelStatus=`, params);
+    // V3 전용 API 호출
+    let res1 = http.get(`${BASE_URL}/admin/dashboard/live`, params);
 
-    check(res1, { 'v2 status 200': (r) => r.status === 200 });
+    // 응답 200 확인
+    check(res1, { 'v3 status 200': (r) => r.status === 200 });
 
+    // V1, V2와 동일하게 1초 대기
     sleep(1);
 }

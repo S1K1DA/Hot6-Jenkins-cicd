@@ -84,9 +84,9 @@ public class AdminDashboardService {
             , Boolean isDeleted
     ) {
         // "오늘" 신규 지표는 Redis에서 즉시 조회
-        Long newUsersToday = adminCacheService.getNewUsersToday();
-        Long newNovelsToday = adminCacheService.getNewNovelsToday();
-        Long newMentosToday = adminCacheService.getNewMentoToday();
+        Long newUsersToday = adminCacheService.getNewUsersByDate();
+        Long newNovelsToday = adminCacheService.getNewNovelsByDate();
+        Long newMentosToday = adminCacheService.getNewMentosByDate();
 
         // 전체 지표는 병합 쿼리 사용
         AdminDashboardUserStatusResponse dbUsersStatus = adminRepository.getIntegratedUserStatus(role);
@@ -96,7 +96,7 @@ public class AdminDashboardService {
         return AdminDashboardResponse.of(
                 AdminDashboardUserStatusResponse.of(dbUsersStatus.totalUsers(), newUsersToday, dbUsersStatus.filterUserRole()),
                 AdminDashboardNovelStatusResponse.of(dbNovelsStatus.totalNovels(), newNovelsToday, dbNovelsStatus.novelsByFilter()),
-                AdminDashboardMentorsStatusResponse.of(dbMentorsStatus.totalMentor(), newMentosToday) // DTO에 맞게 조정
+                AdminDashboardMentorsStatusResponse.of(dbMentorsStatus.totalMentor(), newMentosToday)
         );
     }
 

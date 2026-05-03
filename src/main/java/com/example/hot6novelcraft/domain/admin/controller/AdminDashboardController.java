@@ -2,6 +2,8 @@ package com.example.hot6novelcraft.domain.admin.controller;
 
 import com.example.hot6novelcraft.common.dto.BaseResponse;
 import com.example.hot6novelcraft.domain.admin.dto.response.AdminDashboardResponse;
+import com.example.hot6novelcraft.domain.admin.scheduler.AdminStatsScheduler;
+import com.example.hot6novelcraft.domain.admin.service.AdminCacheService;
 import com.example.hot6novelcraft.domain.admin.service.AdminDashboardService;
 import com.example.hot6novelcraft.domain.novel.entity.enums.NovelStatus;
 import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
@@ -23,6 +25,23 @@ import java.time.LocalDate;
 public class AdminDashboardController {
 
     private final AdminDashboardService adminDashboardService;
+    private final AdminCacheService adminCacheService;
+    private final AdminStatsScheduler adminStatsScheduler;
+
+    // 테스트용
+    @GetMapping("test/increment")
+    public String testIncrement() {
+        adminCacheService.incrementNewUsersToday();
+        adminCacheService.incrementNewNovelsToday();
+        adminCacheService.incrementNewMentorsToday();
+        return "Redis 카운트 +1 증가 완료!";
+    }
+
+    @GetMapping("test/scheduler")
+    public String testScheduler() {
+        adminStatsScheduler.saveDailyStatistics();
+        return "스케쥴러 수동 실행 완료! (DB 확인 하기)";
+    }
 
     /** ======= v1 쿼리 분할 ======= **/
     @GetMapping("/v1")

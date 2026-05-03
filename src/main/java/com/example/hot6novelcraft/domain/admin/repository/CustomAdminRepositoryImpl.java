@@ -162,11 +162,13 @@ public class CustomAdminRepositoryImpl implements CustomAdminRepository {
                 , new CaseBuilder()
                                 .when(user.createdAt.goe(startOfDay))
                                 .then(1L)
-                                .otherwise(0L).sum()
+                                .otherwise(0L)
+                                .sum().coalesce(0L)
                 , new CaseBuilder().when(role != null // 오늘 신규
                                         ? user.role.eq(role)
                                         : user.role.in(UserRole.AUTHOR, UserRole.READER))
-                                .then(1L).otherwise(0L).sum() // 필터
+                                .then(1L).otherwise(0L)
+                                .sum().coalesce(0L) // 필터
                 ))
                 .from(user)
                 .where(user.isDeleted.eq(false) // 제외
@@ -189,14 +191,17 @@ public class CustomAdminRepositoryImpl implements CustomAdminRepository {
                 , new CaseBuilder().when("ALL".equalsIgnoreCase(totalStatusFilter)
                                         ? novel.id.isNotNull()
                                         : novel.isDeleted.eq(false))
-                                        .then(1L).otherwise(0L).sum()
+                                        .then(1L).otherwise(0L)
+                                        .sum().coalesce(0L)
                 // 오늘 신규 등록
                 , new CaseBuilder().when(novel.isDeleted.eq(false)
                                     .and(novel.createdAt.goe(startOfDay)))
-                                    .then(1L).otherwise(0L).sum()
+                                    .then(1L).otherwise(0L)
+                                    .sum().coalesce(0L)
                 // 필터 적용 소설
                 , new CaseBuilder().when(filterNovelByCondition(filterStatus, isSoftDel))
-                        .then(1L).otherwise(0L).sum()
+                                    .then(1L).otherwise(0L)
+                                    .sum().coalesce(0L)
                 ))
                 .from(novel)
                 .fetchOne();
@@ -213,12 +218,12 @@ public class CustomAdminRepositoryImpl implements CustomAdminRepository {
                 // 오늘 신규 멘토/멘티
                 , new CaseBuilder()
                                 .when(mentor.createdAt.goe(startOfDay))
-                                .then(1L).otherwise(0L).sum()
+                                .then(1L).otherwise(0L)
+                                .sum().coalesce(0L)
                 ))
                 .from(mentor)
                 .fetchOne();
     }
-
 
     /** ======= 공통 메소드 ======= **/
 

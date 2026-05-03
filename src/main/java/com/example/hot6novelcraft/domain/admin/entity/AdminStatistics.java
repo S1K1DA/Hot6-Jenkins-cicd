@@ -1,15 +1,13 @@
 package com.example.hot6novelcraft.domain.admin.entity;
 
 import jakarta.persistence.*;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
 
 @Entity
 @Getter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "admin_statistics")
 public class AdminStatistics {
 
@@ -22,12 +20,15 @@ public class AdminStatistics {
     private LocalDate statsDate;
 
     // 해당 날짜의 신규 가입자 수
+    @Column(nullable = false)
     private Long newUserCount;
 
     // 해당 날짜의 신작 소설 수
+    @Column(nullable = false)
     private Long newNovelCount;
 
     // 해당 날짜의 신규 멘토 등록 수
+    @Column(nullable = false)
     private Long newMentorCount;
 
     @Builder

@@ -10,4 +10,7 @@ public interface AdminStatisticsRepository extends JpaRepository<AdminStatistics
 
     // 특정 날짜 통계 데이터 서치
     Optional<AdminStatistics> findByStatsDate(LocalDate statsDate);
+
+    // today 멱등성 체크
+    boolean existsByStatsDate(LocalDate statsDate);
 }

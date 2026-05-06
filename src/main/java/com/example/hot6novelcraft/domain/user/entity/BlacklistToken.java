@@ -24,7 +24,7 @@ public class BlacklistToken extends BaseEntity {
 
     // JWT access token
     @Column(nullable = false, unique = true, length = 64)
-    private String tokenHash;
+    private String token;
 
     @Column(nullable = false)
     private String reason;
@@ -38,7 +38,7 @@ public class BlacklistToken extends BaseEntity {
             , String reason
             , LocalDateTime expiredAt) {
         return BlacklistToken.builder()
-                .tokenHash(token)
+                .token(token)
                 .reason(reason)
                 .expiredAt(expiredAt)
                 .build();

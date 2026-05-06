@@ -43,7 +43,7 @@ public class StatisticsService {
                 return objectMapper.readValue(jsonStr, RevenueStatisticsResponse.class);
             }
         } catch (Exception e) {
-            log.warn("통계 캐시 역직렬화 실패, DB 조회로 전환 - authorId: {}", authorId);
+            log.warn("통계 캐시 역직렬화 실패, DB 조회로 전환 - authorId: {}", authorId, e);
         }
 
         // QueryDSL 집계 쿼리

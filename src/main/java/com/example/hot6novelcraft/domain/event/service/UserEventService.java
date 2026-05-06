@@ -103,7 +103,7 @@ public class UserEventService {
         RLock lock = redissonClient.getLock(EVENT_LOCK_KEY + eventId);
 
         try {
-            boolean acquired = lock.tryLock(5, 10, TimeUnit.SECONDS);
+            boolean acquired = lock.tryLock(5, TimeUnit.SECONDS);
             if (!acquired) {
                 throw new ServiceErrorException(EventExceptionEnum.EVENT_LOCK_ACQUIRE_FAILED);
             }

@@ -63,7 +63,7 @@ class AdminDashboardServiceIntegrationTest {
 
             // when
             AdminDashboardResponse result =
-                    adminDashboardService.getDashboardStatus(null, null, null);
+                    adminDashboardService.getDashboardStatusIntegrated(null, null, null, null);
 
             // then
             assertThat(result.userStatus().totalUsers()).isEqualTo(2L);
@@ -83,7 +83,7 @@ class AdminDashboardServiceIntegrationTest {
 
             // when
             AdminDashboardResponse result =
-                    adminDashboardService.getDashboardStatus(UserRole.READER, null, null);
+                    adminDashboardService.getDashboardStatusIntegrated(UserRole.READER, null, null, null);
 
             // then - 독자만 1명
             assertThat(result.userStatus().filterUserRole()).isEqualTo(1L);
@@ -116,7 +116,7 @@ class AdminDashboardServiceIntegrationTest {
 
             // when
             AdminDashboardResponse result =
-                    adminDashboardService.getDashboardStatus(null, NovelStatus.ONGOING.name(), null);
+                    adminDashboardService.getDashboardStatusIntegrated(null, NovelStatus.ONGOING.name(), null, null);
 
             // then
             assertThat(result.novelStatus().novelsByFilter()).isEqualTo(2L);
@@ -142,7 +142,7 @@ class AdminDashboardServiceIntegrationTest {
 
             // when
             AdminDashboardResponse result =
-                    adminDashboardService.getDashboardStatus(null, null, true);
+                    adminDashboardService.getDashboardStatusIntegrated(null, null, null, true);
 
             // then
             assertThat(result.novelStatus().novelsByFilter()).isEqualTo(1L);
@@ -162,7 +162,7 @@ class AdminDashboardServiceIntegrationTest {
 
                 // when
                 AdminDashboardResponse result =
-                        adminDashboardService.getDashboardStatus(null, null, null);
+                        adminDashboardService.getDashboardStatusIntegrated(null, null, null, null);
 
                 // then - 예외 없이 0 반환
                 assertThat(result).isNotNull();
@@ -186,7 +186,7 @@ class AdminDashboardServiceIntegrationTest {
 
                 // when
                 AdminDashboardResponse result =
-                        adminDashboardService.getDashboardStatus(null, null, null);
+                        adminDashboardService.getDashboardStatusIntegrated(null, null, null, null);
 
                 // then - 탈퇴 회원 제외하고 1명만
                 assertThat(result.userStatus().totalUsers()).isEqualTo(1L);
@@ -205,7 +205,7 @@ class AdminDashboardServiceIntegrationTest {
 
                 // when
                 AdminDashboardResponse result =
-                        adminDashboardService.getDashboardStatus(null, null, null);
+                        adminDashboardService.getDashboardStatusIntegrated(null, null, null, null);
 
                 // then - 관리자 제외하고 독자 1명만
                 assertThat(result.userStatus().totalUsers()).isEqualTo(1L);

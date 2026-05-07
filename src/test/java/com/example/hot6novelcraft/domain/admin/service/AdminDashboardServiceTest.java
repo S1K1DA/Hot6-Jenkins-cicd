@@ -52,7 +52,7 @@ class AdminDashboardServiceTest {
 
             // when - 필터 없이 전체 조회
             AdminDashboardResponse result =
-                    adminDashboardService.getDashboardStatus(null, null, null);
+                    adminDashboardService.getDashboardStatusIntegrated(null, null, null, null);
 
             // then - 응답값 검증
             assertThat(result).isNotNull();
@@ -92,7 +92,7 @@ class AdminDashboardServiceTest {
 
             // when
             AdminDashboardResponse result =
-                    adminDashboardService.getDashboardStatus(UserRole.READER, null, null);
+                    adminDashboardService.getDashboardStatusIntegrated(UserRole.READER, null, null, null);
 
             // then
             assertThat(result.userStatus().filterUserRole()).isEqualTo(60L); // 독자 수만
@@ -114,7 +114,7 @@ class AdminDashboardServiceTest {
 
             // when
             AdminDashboardResponse result =
-                    adminDashboardService.getDashboardStatus(null, NovelStatus.ONGOING.name(), null);
+                    adminDashboardService.getDashboardStatusIntegrated(null, NovelStatus.ONGOING.name(), null, null);
 
             // then
             assertThat(result.novelStatus().novelsByFilter()).isEqualTo(100L); // 연재 중 소설 수
@@ -136,7 +136,7 @@ class AdminDashboardServiceTest {
 
             // when
             AdminDashboardResponse result =
-                    adminDashboardService.getDashboardStatus(null, null, true);
+                    adminDashboardService.getDashboardStatusIntegrated(null, null, null, true);
 
             // then
             assertThat(result.novelStatus().novelsByFilter()).isEqualTo(10L);
@@ -158,7 +158,7 @@ class AdminDashboardServiceTest {
 
             // when
             AdminDashboardResponse result =
-                    adminDashboardService.getDashboardStatus(null, null, null);
+                    adminDashboardService.getDashboardStatusIntegrated(null, null, null, null);
 
             // then - null이 아닌 0으로 반환되는지 검증
             assertThat(result.userStatus().totalUsers()).isZero();
@@ -184,7 +184,7 @@ class AdminDashboardServiceTest {
             // when & then - 예외가 그대로 전파되는지 검증
             org.junit.jupiter.api.Assertions.assertThrows(
                     RuntimeException.class,
-                    () -> adminDashboardService.getDashboardStatus(null, null, null)
+                    () -> adminDashboardService.getDashboardStatusIntegrated(null, null, null, null)
             );
         }
     }

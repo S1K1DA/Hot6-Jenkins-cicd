@@ -169,6 +169,10 @@ class CoverServiceTest {
         assertThatThrownBy(() -> coverService.generateCover(1L, 1L))
                 .isInstanceOf(ServiceErrorException.class)
                 .hasMessageContaining("이미지 업로드에 실패했습니다");
+
+        // S3 실패 시 포인트 차감이 일어나지 않아야 함
+        verify(pointService, never()).deduct(any(), any());
+        verify(pointHistoryRepository, never()).save(any());
     }
 
     @Test

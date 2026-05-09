@@ -156,7 +156,7 @@ public class OpenAiReviewClient implements AiReviewClient {
             throw new IllegalStateException("AI 리뷰 파싱 실패", e);
         }
     }
-
+    // OpenAI JSON 응답 -> 이 record로 변환
     private record ParsedAiResponse(List<ParsedComment> comments) {}
 
     private record ParsedComment(String nickname, String content, double rating) {}

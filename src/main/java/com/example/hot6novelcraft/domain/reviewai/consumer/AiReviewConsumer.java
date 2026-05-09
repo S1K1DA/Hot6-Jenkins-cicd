@@ -32,10 +32,6 @@ public class AiReviewConsumer {
         log.info("[AI 리뷰 Consumer 수신] jobId={}, episodeId={}, userId={}",
                 message.jobId(), message.episodeId(), message.userId());
 
-        try {
-            aiReviewService.processReview(message);
-        } catch (Exception e) {
-            log.error("[AI 리뷰 Consumer 처리 중 예외] jobId={}", message.jobId(), e);
-        }
+        aiReviewService.processReview(message);
     }
 }

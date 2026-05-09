@@ -15,6 +15,7 @@ import com.example.hot6novelcraft.domain.episode.entity.enums.EpisodeStatus;
 import com.example.hot6novelcraft.domain.episode.repository.EpisodeRepository;
 import com.example.hot6novelcraft.domain.novel.entity.Novel;
 import com.example.hot6novelcraft.domain.novel.repository.NovelRepository;
+import com.example.hot6novelcraft.domain.reviewai.entity.enums.AiReviewJobStatus;
 import com.example.hot6novelcraft.domain.reviewai.producer.AiReviewProducer;
 import com.example.hot6novelcraft.domain.user.entity.UserDetailsImpl;
 import com.example.hot6novelcraft.domain.user.entity.enums.UserRole;
@@ -143,7 +144,14 @@ public class AiReviewService {
                 episode.getTitle(),
                 content
         );
-        aiReviewProducer.send(message);
+        aiReviewProducer.send(message).exceptionally(ex -> {
+            log.error("[AI 리뷰 Kafka 발행 실패] jobId={}", jobId, ex);
+            AiReviewJob failedJob = findJob(jobId);
+            if (failedJob != null) {
+                saveJob(failedJob.failed("Kafka 발행에 실패했습니다."));
+            }
+            return null;
+        });
 
         log.info("[AI 리뷰 v2 요청] jobId={}, episodeId={}, userId={}",
                 jobId, episodeId, userId);
@@ -167,6 +175,17 @@ public class AiReviewService {
         String jobId = message.jobId();
         Long userId = message.userId();
         Long episodeId = message.episodeId();
+
+        AiReviewJob currentJob = findJob(jobId);
+        if (currentJob == null) {
+            log.warn("[AI 리뷰 Consumer] Job 없음, 스킵 jobId={}", jobId);
+            return;
+        }
+        if (currentJob.status() != AiReviewJobStatus.PROCESSING) {
+            log.info("[AI 리뷰 Consumer] 이미 처리된 Job 스킵 jobId={}, status={}",
+                    jobId, currentJob.status());
+            return;
+        }
 
         log.info("[AI 리뷰 Consumer 처리 시작] jobId={}, episodeId={}", jobId, episodeId);
 

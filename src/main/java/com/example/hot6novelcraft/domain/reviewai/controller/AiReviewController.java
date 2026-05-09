@@ -48,7 +48,7 @@ public class AiReviewController {
     ) {
         AiReviewJobResponse response = aiReviewService.requestReviewAsync(episodeId, userDetails);
 
-        return ResponseEntity.ok(
+        return ResponseEntity.accepted().body(
                 BaseResponse.success("202", "AI 리뷰 요청이 접수되었습니다", response)
         );
     }

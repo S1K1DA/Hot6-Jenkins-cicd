@@ -25,12 +25,19 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -49,6 +56,8 @@ class AiReviewServiceTest {
     @Mock RedisTemplate<String, Object> redisTemplate;
     @Mock ValueOperations<String, Object> valueOperations;
     @Mock ObjectMapper objectMapper;
+    @Mock RedissonClient redissonClient;  // ← 추가
+    @Mock RLock rLock;                    // ← 추가
 
     @InjectMocks
     AiReviewService aiReviewService;
@@ -113,7 +122,6 @@ class AiReviewServiceTest {
         return PROCESSING상태_Job().failed("AI 리뷰 생성에 실패했습니다.");
     }
 
-    // Redis Mocking 헬퍼
     private void Redis_Job저장_설정() {
         given(redisTemplate.opsForValue()).willReturn(valueOperations);
     }
@@ -121,6 +129,19 @@ class AiReviewServiceTest {
     private void Redis_Job조회_설정(String jobJson) {
         given(redisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.get(anyString())).willReturn(jobJson);
+    }
+
+    // 락 획득 성공 설정
+    private void 락_획득_성공() throws InterruptedException {
+        given(redissonClient.getLock(anyString())).willReturn(rLock);
+        given(rLock.tryLock(anyLong(), anyLong(), any())).willReturn(true);
+        given(rLock.isHeldByCurrentThread()).willReturn(true);
+    }
+
+    // 락 획득 실패 설정
+    private void 락_획득_실패() throws InterruptedException {
+        given(redissonClient.getLock(anyString())).willReturn(rLock);
+        given(rLock.tryLock(anyLong(), anyLong(), any())).willReturn(false);
     }
 
     // ===================== v1 - getReview() =====================
@@ -175,9 +196,9 @@ class AiReviewServiceTest {
 
     @Test
     void v1_본인소설아니면_실패() {
-        UserDetailsImpl userDetails = 작가(); // userId = 1L
+        UserDetailsImpl userDetails = 작가();
         Episode episode = 회차(EpisodeStatus.DRAFT, "내용");
-        Novel novel = 소설(2L); // authorId = 2L (다른 작가)
+        Novel novel = 소설(2L);
 
         given(episodeRepository.findById(1L)).willReturn(Optional.of(episode));
         given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
@@ -220,7 +241,7 @@ class AiReviewServiceTest {
 
         given(episodeRepository.findById(1L)).willReturn(Optional.of(episode));
         given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
-        given(pointService.getBalance(1L)).willReturn(100L); // 200P 부족
+        given(pointService.getBalance(1L)).willReturn(100L);
 
         assertThrows(ServiceErrorException.class,
                 () -> aiReviewService.getReview(1L, userDetails));
@@ -241,7 +262,6 @@ class AiReviewServiceTest {
         assertThrows(ServiceErrorException.class,
                 () -> aiReviewService.getReview(1L, userDetails));
 
-        // 포인트 차감 안됨
         verify(pointService, never()).deductForAi(anyLong(), anyLong(), anyLong());
     }
 
@@ -256,6 +276,7 @@ class AiReviewServiceTest {
         given(episodeRepository.findById(1L)).willReturn(Optional.of(episode));
         given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
         given(pointService.getBalance(1L)).willReturn(500L);
+        락_획득_성공();  // ← 추가
         Redis_Job저장_설정();
         given(objectMapper.writeValueAsString(any())).willReturn("{}");
         given(aiReviewProducer.send(any())).willReturn(CompletableFuture.completedFuture(null));
@@ -276,46 +297,124 @@ class AiReviewServiceTest {
     }
 
     @Test
-    void v2_본인소설아니면_실패() {
-        UserDetailsImpl userDetails = 작가(); // userId = 1L
+    void v2_본인소설아니면_실패() throws Exception {
+        UserDetailsImpl userDetails = 작가();
         Episode episode = 회차(EpisodeStatus.DRAFT, "내용");
-        Novel novel = 소설(2L); // authorId = 2L
+        Novel novel = 소설(2L);
 
         given(episodeRepository.findById(1L)).willReturn(Optional.of(episode));
         given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
+        락_획득_성공();  // ← 추가
 
         assertThrows(ServiceErrorException.class,
                 () -> aiReviewService.requestReviewAsync(1L, userDetails));
     }
 
     @Test
-    void v2_DRAFT아니면_실패() {
+    void v2_DRAFT아니면_실패() throws Exception {
         UserDetailsImpl userDetails = 작가();
         Episode episode = 회차(EpisodeStatus.PUBLISHED, "내용");
         Novel novel = 소설(1L);
 
         given(episodeRepository.findById(1L)).willReturn(Optional.of(episode));
         given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
+        락_획득_성공();  // ← 추가
 
         assertThrows(ServiceErrorException.class,
                 () -> aiReviewService.requestReviewAsync(1L, userDetails));
     }
 
     @Test
-    void v2_포인트부족하면_Kafka발행안함() {
+    void v2_포인트부족하면_Kafka발행안함() throws Exception {
         UserDetailsImpl userDetails = 작가();
         Episode episode = 회차(EpisodeStatus.DRAFT, "소설 본문 내용입니다.");
         Novel novel = 소설(1L);
 
         given(episodeRepository.findById(1L)).willReturn(Optional.of(episode));
         given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
-        given(pointService.getBalance(1L)).willReturn(100L); // 200P 부족
+        given(pointService.getBalance(1L)).willReturn(100L);
+        락_획득_성공();  // ← 추가
 
         assertThrows(ServiceErrorException.class,
                 () -> aiReviewService.requestReviewAsync(1L, userDetails));
 
-        // Kafka 발행 안됨
         verify(aiReviewProducer, never()).send(any());
+    }
+
+    @Test
+    void v2_분산락획득실패시_예외발생() throws Exception {
+        UserDetailsImpl userDetails = 작가();
+        락_획득_실패();  // ← 락 실패!
+
+        assertThrows(ServiceErrorException.class,
+                () -> aiReviewService.requestReviewAsync(1L, userDetails));
+
+        verify(aiReviewProducer, never()).send(any());
+    }
+
+    // ===================== 동시성 테스트 =====================
+
+    @Test
+    void v2_동시요청_분산락으로_1건만처리() throws Exception {
+        int threadCount = 5;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch startLatch = new CountDownLatch(1);   // 동시 출발
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+
+        AtomicInteger successCount = new AtomicInteger(0);   // 성공 횟수
+        AtomicInteger failCount = new AtomicInteger(0);       // 실패 횟수 (락 거절)
+
+        // 첫 번째 요청만 락 획득 성공, 나머지는 실패
+        AtomicInteger lockCallCount = new AtomicInteger(0);
+        given(redissonClient.getLock(anyString())).willReturn(rLock);
+        given(rLock.tryLock(anyLong(), anyLong(), any())).willAnswer(inv -> {
+            int callCount = lockCallCount.incrementAndGet();
+            return callCount == 1; // 첫 번째만 true, 나머지는 false
+        });
+        given(rLock.isHeldByCurrentThread()).willReturn(true);
+
+        // 정상 처리 Mock 설정
+        Episode episode = 회차(EpisodeStatus.DRAFT, "소설 본문 내용입니다.");
+        Novel novel = 소설(1L);
+        given(episodeRepository.findById(1L)).willReturn(Optional.of(episode));
+        given(novelRepository.findById(1L)).willReturn(Optional.of(novel));
+        given(pointService.getBalance(1L)).willReturn(500L);
+        Redis_Job저장_설정();
+        given(objectMapper.writeValueAsString(any())).willReturn("{}");
+        given(aiReviewProducer.send(any())).willReturn(CompletableFuture.completedFuture(null));
+
+        UserDetailsImpl userDetails = 작가();
+
+        // 5개 스레드 동시 실행
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                try {
+                    startLatch.await(); // 동시 출발 대기
+                    aiReviewService.requestReviewAsync(1L, userDetails);
+                    successCount.incrementAndGet();
+                } catch (ServiceErrorException e) {
+                    failCount.incrementAndGet();
+                } catch (Exception e) {
+                    failCount.incrementAndGet();
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+        }
+
+        startLatch.countDown();                    // 동시 출발!
+        doneLatch.await(10, TimeUnit.SECONDS);     // 완료 대기
+
+        executor.shutdown();
+
+        System.out.println("성공: " + successCount.get() + "건");
+        System.out.println("실패(락 거절): " + failCount.get() + "건");
+
+        // 5개 동시 요청 중 1개만 성공, 4개는 락 거절
+        assertEquals(1, successCount.get(), "락으로 인해 1건만 성공해야 함");
+        assertEquals(4, failCount.get(), "나머지 4건은 락 거절");
+        // Kafka 발행은 1번만
+        verify(aiReviewProducer, times(1)).send(any());
     }
 
     // ===================== processReview() =====================
@@ -326,7 +425,6 @@ class AiReviewServiceTest {
                 "test-job-id", 1L, 1L, "테스트 제목", "소설 본문 내용입니다."
         );
 
-        // ↓ 실제 직렬화 안 하고 그냥 더미 문자열
         Redis_Job조회_설정("{}");
         given(objectMapper.readValue(anyString(), eq(AiReviewJob.class)))
                 .willReturn(PROCESSING상태_Job());
@@ -341,19 +439,17 @@ class AiReviewServiceTest {
     }
 
     @Test
-    void processReview_Job없으면_스킵() throws Exception {
+    void processReview_Job없으면_스킵() {
         AiReviewMessage message = new AiReviewMessage(
                 "test-job-id", 1L, 1L, "테스트 제목", "소설 본문"
         );
 
         given(redisTemplate.opsForValue()).willReturn(valueOperations);
-        given(valueOperations.get(anyString())).willReturn(null); // Job 없음
+        given(valueOperations.get(anyString())).willReturn(null);
 
         aiReviewService.processReview(message);
 
-        // OpenAI 호출 안됨
         verify(aiReviewClient, never()).generate(anyLong(), anyString(), anyString());
-        // 포인트 차감 안됨
         verify(pointService, never()).deductForAi(anyLong(), anyLong(), anyLong());
     }
 
@@ -366,13 +462,11 @@ class AiReviewServiceTest {
         given(redisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.get(anyString())).willReturn("{}");
         given(objectMapper.readValue(anyString(), eq(AiReviewJob.class)))
-                .willReturn(COMPLETED상태_Job()); // 이미 COMPLETED
+                .willReturn(COMPLETED상태_Job());
 
         aiReviewService.processReview(message);
 
-        // OpenAI 호출 안됨 (중복 처리 방지)
         verify(aiReviewClient, never()).generate(anyLong(), anyString(), anyString());
-        // 포인트 차감 안됨
         verify(pointService, never()).deductForAi(anyLong(), anyLong(), anyLong());
     }
 
@@ -385,11 +479,10 @@ class AiReviewServiceTest {
         given(redisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.get(anyString())).willReturn("{}");
         given(objectMapper.readValue(anyString(), eq(AiReviewJob.class)))
-                .willReturn(FAILED상태_Job()); // 이미 FAILED
+                .willReturn(FAILED상태_Job());
 
         aiReviewService.processReview(message);
 
-        // OpenAI 호출 안됨
         verify(aiReviewClient, never()).generate(anyLong(), anyString(), anyString());
     }
 
@@ -409,7 +502,6 @@ class AiReviewServiceTest {
 
         aiReviewService.processReview(message);
 
-        // 포인트 차감 안됨
         verify(pointService, never()).deductForAi(anyLong(), anyLong(), anyLong());
     }
 
@@ -431,7 +523,6 @@ class AiReviewServiceTest {
 
         aiReviewService.processReview(message);
 
-        // Job이 FAILED 상태로 저장됨 (save 호출됨)
         verify(valueOperations, atLeastOnce()).set(anyString(), anyString(), any());
     }
 

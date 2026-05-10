@@ -24,6 +24,7 @@ public enum EpisodeExceptionEnum implements ErrorCode {
     NOVEL_NO_PURCHASABLE_EPISODES(HttpStatus.BAD_REQUEST, "구매 가능한 회차가 없습니다."),
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다."),
     COMMENT_FORBIDDEN(HttpStatus.FORBIDDEN, "본인 댓글만 삭제할 수 있습니다."),
+    AI_REVIEW_LOCK_ACQUIRE_FAILED(HttpStatus.TOO_MANY_REQUESTS, "AI 리뷰 요청이 처리 중입니다. 잠시 후 다시 시도해주세요."),
 
     // AI 리뷰 관련
     AI_REVIEW_FORBIDDEN(HttpStatus.FORBIDDEN, "본인 소설의 회차에만 AI 리뷰를 받을 수 있습니다."),

@@ -23,12 +23,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -42,7 +45,10 @@ public class AiReviewService {
 
     private final AiReviewProducer aiReviewProducer;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final RedissonClient redissonClient;
     private final ObjectMapper objectMapper;
+
+    private static final String AI_REVIEW_LOCK_KEY = "lock:ai-review:";
 
     private static final Long AI_REVIEW_COST = 200L;
     private static final String JOB_KEY_PREFIX = "ai_review:job:";
@@ -108,55 +114,69 @@ public class AiReviewService {
         // 작가 권한 확인
         validateAuthorRole(userDetails);
 
-        // 회차 조회
-        Episode episode = findEpisodeById(episodeId);
+        // 분산락 (같은 회차 동시 요청 방지 -> 포인트 중복 차감 방지)
+        RLock lock = redissonClient.getLock(AI_REVIEW_LOCK_KEY + episodeId);
 
-        // 본인 소설 확인
-        validateOwnership(episode.getNovelId(), userId);
-
-        // 발행 전(DRAFT) 회차만 AI 리뷰 가능
-        if (episode.getStatus() != EpisodeStatus.DRAFT) {
-            throw new ServiceErrorException(EpisodeExceptionEnum.AI_REVIEW_ONLY_DRAFT);
-        }
-
-        // 본문 비어있으면 거부
-        String content = episode.getContent();
-        if (content == null || content.isBlank()) {
-            throw new ServiceErrorException(EpisodeExceptionEnum.AI_REVIEW_CONTENT_EMPTY);
-        }
-
-        // 포인트 잔액 사전 체크 (Kafka 발행 전 미리 검증해서 무의미한 호출 방지) - 테스트할때 주석
-        Long balance = pointService.getBalance(userId);
-        if (balance < AI_REVIEW_COST) {
-            throw new ServiceErrorException(PaymentExceptionEnum.ERR_INSUFFICIENT_POINT);
-        }
-
-        // Job 생성 (PROCESSING 상태)
-        String jobId = UUID.randomUUID().toString();
-        AiReviewJob job = AiReviewJob.create(jobId, episodeId, userId);
-        saveJob(job);
-
-        // Kafka 메시지 발행
-        AiReviewMessage message = new AiReviewMessage(
-                jobId,
-                episodeId,
-                userId,
-                episode.getTitle(),
-                content
-        );
-        aiReviewProducer.send(message).exceptionally(ex -> {
-            log.error("[AI 리뷰 Kafka 발행 실패] jobId={}", jobId, ex);
-            AiReviewJob failedJob = findJob(jobId);
-            if (failedJob != null) {
-                saveJob(failedJob.failed("Kafka 발행에 실패했습니다."));
+        try {
+            boolean acquired = lock.tryLock(0, 3, TimeUnit.SECONDS);
+            if (!acquired) {
+                throw new ServiceErrorException(EpisodeExceptionEnum.AI_REVIEW_LOCK_ACQUIRE_FAILED);
             }
-            return null;
-        });
 
-        log.info("[AI 리뷰 v2 요청] jobId={}, episodeId={}, userId={}",
-                jobId, episodeId, userId);
+            // 회차 조회
+            Episode episode = findEpisodeById(episodeId);
 
-        return AiReviewJobResponse.processing(jobId);
+            // 본인 소설 확인
+            validateOwnership(episode.getNovelId(), userId);
+
+            // 발행 전(DRAFT) 회차만 AI 리뷰 가능
+            if (episode.getStatus() != EpisodeStatus.DRAFT) {
+                throw new ServiceErrorException(EpisodeExceptionEnum.AI_REVIEW_ONLY_DRAFT);
+            }
+
+            // 본문 비어있으면 거부
+            String content = episode.getContent();
+            if (content == null || content.isBlank()) {
+                throw new ServiceErrorException(EpisodeExceptionEnum.AI_REVIEW_CONTENT_EMPTY);
+            }
+
+            // 포인트 잔액 사전 체크
+            Long balance = pointService.getBalance(userId);
+            if (balance < AI_REVIEW_COST) {
+                throw new ServiceErrorException(PaymentExceptionEnum.ERR_INSUFFICIENT_POINT);
+            }
+
+            // Job 생성 (PROCESSING 상태)
+            String jobId = UUID.randomUUID().toString();
+            AiReviewJob job = AiReviewJob.create(jobId, episodeId, userId);
+            saveJob(job);
+
+            // Kafka 메시지 발행
+            AiReviewMessage message = new AiReviewMessage(
+                    jobId, episodeId, userId, episode.getTitle(), content
+            );
+            aiReviewProducer.send(message).exceptionally(ex -> {
+                log.error("[AI 리뷰 Kafka 발행 실패] jobId={}", jobId, ex);
+                AiReviewJob failedJob = findJob(jobId);
+                if (failedJob != null) {
+                    saveJob(failedJob.failed("Kafka 발행에 실패했습니다."));
+                }
+                return null;
+            });
+
+            log.info("[AI 리뷰 v2 요청] jobId={}, episodeId={}, userId={}",
+                    jobId, episodeId, userId);
+
+            return AiReviewJobResponse.processing(jobId);
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ServiceErrorException(EpisodeExceptionEnum.AI_REVIEW_LOCK_ACQUIRE_FAILED);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
     }
 
     // Job 상태 조회 (폴링용)

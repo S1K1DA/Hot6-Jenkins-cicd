@@ -11,6 +11,7 @@ import com.example.hot6novelcraft.domain.recommendationAi.dto.UserBehaviorSummar
 import com.example.hot6novelcraft.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +19,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Slf4j(topic = "RecommendationController")
+@Slf4j(topic = "RecommendationFacade")
 @Service
 @RequiredArgsConstructor
 public class RecommendationFacade {
@@ -66,34 +67,34 @@ public class RecommendationFacade {
                 : getFilteredCandidates(genrePreference); // 데이터 있으면 선호 장르 기반 필터
 
         // 행동 데이터 부족 시 트렌드 추천 출력 (fallback)
-        List<Long> recommendedIsd;
+        List<Long> recommendedIds;
         String type;
 
         if (behavior.inInsufficientData()) {
             log.info("[AI 추천] 행동 데이터 부족 -> 트렌드 추천으로 전환 userId: {}", userId);
 
-            recommendedIsd = recommendationService.getTrendRecommendations(behavior.popularTags(), candidates);
+            recommendedIds = recommendationService.getTrendRecommendations(behavior.popularTags(), candidates);
             type = "TREND";
 
         } else {
-            recommendedIsd = recommendationService.getPersonalizedRecommendations(behavior, genrePreference, candidates);
+            recommendedIds = recommendationService.getPersonalizedRecommendations(behavior, genrePreference, candidates);
             type = "PERSONALIZED";
         }
 
         long elapsed = System.currentTimeMillis() - start;
 
         // 성능 + 정합성 한 줄 로그 동시 기록
-        logRecommendation(userId, type, elapsed, genrePreference, recommendedIsd);
+        logRecommendation(userId, type, elapsed, genrePreference, recommendedIds);
 
         // AI가 빈 목록 반환 시 인기 소설로 최종 출력 (fallback)
-        if(recommendedIsd.isEmpty()) {
+        if(recommendedIds.isEmpty()) {
             log.warn("[AI 추천] 추천 실패 -> 인기 소설로 대체 userId: {}", userId);
 
             return getFallbackRecommendation();
         }
 
         // 선호 장르 정보를 behavior이랑 같이 AI 전달
-        List<NovelListResponse> novels = getNovelsByIds(recommendedIsd);
+        List<NovelListResponse> novels = getNovelsByIds(recommendedIds);
         RecommendationResponse response = new RecommendationResponse(novels, type);
 
         // 캐시 저장
@@ -151,14 +152,16 @@ public class RecommendationFacade {
         String preferredGenre = topGenre.get();
 
         // 선호 장르 소설 30개
-        List<NovelSummaryForAi> preferred = novelRepository.findByGenreForRecommendation(preferredGenre, 30)
+        List<NovelSummaryForAi> preferred = novelRepository.findByGenreForRecommendation(preferredGenre, PageRequest.of(0, 30))
+                .getContent()
                 .stream()
                 .map(n -> new NovelSummaryForAi(
                         n.getId(), n.getCoverImageUrl(), n.getTitle(), n.getGenre(), n.getTags(), n.getAuthorId()))
                 .collect(Collectors.toList());
 
         // 나머지 장르 소설 20개 (다양성 확보)
-        List<NovelSummaryForAi> others = novelRepository.findExcludeGenreForRecommendation(preferredGenre, 20)
+        List<NovelSummaryForAi> others = novelRepository.findExcludeGenreForRecommendation(preferredGenre, PageRequest.of(0, 20))
+                .getContent()
                 .stream()
                 .map(n -> new NovelSummaryForAi(
                         n.getId(), n.getCoverImageUrl(), n.getTitle(), n.getGenre(), n.getTags(), n.getAuthorId()))
@@ -171,16 +174,6 @@ public class RecommendationFacade {
         log.info("[AI 추천] 후보 구성 - 선호장르 ({}) {}개 + 기타 {}개", preferredGenre, preferred.size(), others.size());
 
         return candidates;
-    }
-
-    private RecommendationResponse buildResponse(List<Long> ids, String type) {
-        if(ids.isEmpty()) {
-            return getFallbackRecommendation();
-        }
-
-        List<NovelListResponse> novels = getNovelsByIds(ids);
-
-        return new RecommendationResponse(novels, type);
     }
 
     // AI에게 넘길 후보 소설 목록 조회 - 연재(ongoing), 완결(completed) 상태만 최신순 50개로 제한

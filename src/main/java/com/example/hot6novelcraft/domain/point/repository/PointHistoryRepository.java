@@ -22,6 +22,6 @@ public interface PointHistoryRepository extends JpaRepository<PointHistory, Long
     List<Long> findPurchasedEpisodeIds(@Param("userId") Long userId, @Param("novelId") Long novelId, @Param("type") PointHistoryType type);
 
     // AI 추천 - 최근 구매한 novelId 목록 조회
-    @Query("SELECT ph.novelId FROM PointHistory ph WHERE ph.userId = :userId AND ph.type = :type AND ph.novelId IS NOT NULL ORDER BY ph.createdAt DESC LIMIT :limit")
-    List<Long> findRecentPurchasedNovelIds(@Param("userId") Long userId, @Param("type") PointHistoryType type, @Param("limit") int limit);
+    @Query("SELECT ph.novelId FROM PointHistory ph WHERE ph.userId = :userId AND ph.type = :type AND ph.novelId IS NOT NULL ORDER BY ph.createdAt DESC")
+    Page<Long> findRecentPurchasedNovelIds(@Param("userId") Long userId, @Param("type") PointHistoryType type, Pageable pageable);
 }

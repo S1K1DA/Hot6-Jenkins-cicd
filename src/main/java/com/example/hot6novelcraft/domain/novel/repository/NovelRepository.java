@@ -47,12 +47,12 @@ public interface NovelRepository extends JpaRepository<Novel, Long>, CustomNovel
     List<Novel> findTop50ForRecommendation();
 
     // AI 추천 - 특정 장르 소설 (선호 장르용)
-    @Query("SELECT n FROM Novel n WHERE n.isDeleted = false AND n.status IN ('ONGOING', 'COMPLETED') AND n. genre = :genre ORDER BY n.viewCount DESC LIMIT :limit")
-    List<Novel> findByGenreForRecommendation(@Param("genre") String genre, @Param("limit") int limit);
+    @Query("SELECT n FROM Novel n WHERE n.isDeleted = false AND n.status IN ('ONGOING', 'COMPLETED') AND n.genre = :genre ORDER BY n.viewCount DESC")
+    Page<Novel> findByGenreForRecommendation(@Param("genre") String genre, Pageable pageable);
 
     // AI 추천 - 특정 장르 제외 소설 (다양성용)
-    @Query("SELECT n FROM Novel n WHERE n.isDeleted = false AND n.status IN ('ONGOING', 'COMPLETED') AND n. genre != :genre ORDER BY n.viewCount DESC LIMIT :limit")
-    List<Novel> findExcludeGenreForRecommendation(@Param("genre") String genre, @Param("limit") int limit);
+    @Query("SELECT n FROM Novel n WHERE n.isDeleted = false AND n.status IN ('ONGOING', 'COMPLETED') AND n.genre != :genre ORDER BY n.viewCount DESC")
+    Page<Novel> findExcludeGenreForRecommendation(@Param("genre") String genre, Pageable pageable);
 
     // AI 추천 - DB fallback
     List<Novel> findTop10ByIsDeletedFalseOrderByViewCountDesc();

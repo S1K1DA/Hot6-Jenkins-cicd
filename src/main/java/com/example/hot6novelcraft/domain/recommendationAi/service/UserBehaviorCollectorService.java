@@ -7,6 +7,7 @@ import com.example.hot6novelcraft.domain.point.repository.PointHistoryRepository
 import com.example.hot6novelcraft.domain.recommendationAi.dto.UserBehaviorSummary;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -45,7 +46,8 @@ public class UserBehaviorCollectorService {
     private List<String> collectRecentReadNovels(Long userId) {
         try {
             List<Long> novelIds = pointHistoryRepository
-                    .findRecentPurchasedNovelIds(userId, PointHistoryType.NOVEL, 10);
+                    .findRecentPurchasedNovelIds(userId, PointHistoryType.NOVEL, PageRequest.of(0, 10))
+                    .getContent();
 
             if(novelIds.isEmpty()) {
                 return Collections.emptyList();
@@ -94,7 +96,7 @@ public class UserBehaviorCollectorService {
         }
     }
 
-    // 좋아요한 회자 소설 태그 수집 (로그인 사용자)
+    // 좋아요한 회차 소설 태그 수집 (로그인 사용자)
     private List<String> collectLikedTags(Long userId) {
         try {
             return novelRepository.findTagsByUserLikedEpisodes(userId);

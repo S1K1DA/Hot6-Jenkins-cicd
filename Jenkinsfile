@@ -83,6 +83,9 @@ pipeline {
                         sh """
                             ssh -o StrictHostKeyChecking=no ec2-user@${APP_EC2_IP} << 'ENDSSH'
 
+                                # 인프라 실행
+                                docker-compose up -d
+
                                 docker stop novelcraft || true
                                 docker rm novelcraft || true
 

@@ -6,9 +6,9 @@ encryption:
     secret-key: ${AES_SECRET_KEY}   # 반드시 16자리
     iv: ${AES_IV}                   # 반드시 16자리
 
-spring:
-  profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
+#spring:
+#  profiles:
+#    active: ${SPRING_PROFILES_ACTIVE:dev}
 
   ai:
     openai:

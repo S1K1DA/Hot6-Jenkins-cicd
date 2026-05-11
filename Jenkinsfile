@@ -68,6 +68,8 @@ pipeline {
                     string(credentialsId: 'redis-sentinel-nodes',  variable: 'REDIS_SENTINEL_NODES'),
                 ]) {
                     sshagent(['app-ec2-ssh-key']) {
+                        sh "ssh -o StrictHostKeyChecking=no ec2-user@${APP_EC2_IP} 'mkdir -p ~/monitoring ~/init'"
+
                         sh """
                             # 파일 전송
                             scp -o StrictHostKeyChecking=no docker-compose.yml ec2-user@${APP_EC2_IP}:~/

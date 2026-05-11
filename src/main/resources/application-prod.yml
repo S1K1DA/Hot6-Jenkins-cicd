@@ -18,7 +18,7 @@ encryption:
     redis:
       sentinel:
         master: ${REDIS_SENTINEL_MASTER:mymaster}
-        nodes: ${REDIS_SENTINEL_NODES}
+        nodes: ${REDIS_SENTINEL_NODES:redis-sentinel-1:26379, redis-sentinel-2:26380, redis-sentinel-3:26381}
       lettuce:
         pool:
           max-active: 10
@@ -98,7 +98,7 @@ app:
   frontend:
     url: ${FRONTEND_URL:http://localhost:8080}
   redis:
-    nat-mapping-ip: ${REDIS_NAT_MAPPING_IP:127.0.0.1}
+    nat-mapping-ip:
 
 jwt:
   secret:

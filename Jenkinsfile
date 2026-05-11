@@ -83,6 +83,8 @@ pipeline {
                         sh """
                             ssh -o StrictHostKeyChecking=no ec2-user@${APP_EC2_IP} << 'ENDSSH'
 
+                                cd /home/ec2-user/Hot6-Jenkins-cicd
+
                                 # 인프라 실행
                                 docker-compose up -d
 

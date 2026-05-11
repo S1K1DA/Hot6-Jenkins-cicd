@@ -17,7 +17,7 @@ import java.util.List;
 
 @Slf4j
 @Component
-@Profile("!test")
+@Profile({"!test", "prod"})
 public class OpenAiReviewClient implements AiReviewClient {
 
     private final ChatClient chatClient;
